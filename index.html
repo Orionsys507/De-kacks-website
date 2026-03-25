@@ -1291,8 +1291,9 @@
         Number(poolDetails.computedCost || 0) +
         Number(cateringDetails.totalCost || 0) +
         Number(hallDetails.cost || 0);
+      const bookingId = `pending_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       const booking = {
-        id: Date.now() + Math.floor(Math.random() * 1000),
+        id: bookingId,
         name,
         guests,
         checkInDate,
