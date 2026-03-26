@@ -674,21 +674,23 @@
   }
 
   .welcome-modal {
-    width: min(520px, 100%);
+    width: min(380px, 92vw);
+    min-height: 540px;
     background:
       radial-gradient(circle at top center, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 42%),
       linear-gradient(155deg, #fff9ef, #effaf7);
     border: 1px solid rgba(255, 255, 255, 0.7);
-    border-radius: 28px;
+    border-radius: 34px;
     box-shadow: 0 28px 70px rgba(5, 38, 46, 0.24);
-    padding: 28px 28px 30px;
+    padding: 34px 26px 32px;
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    gap: 14px;
+    justify-content: center;
+    gap: 16px;
   }
 
   .welcome-modal::before {
@@ -721,13 +723,13 @@
   }
 
   .welcome-modal h2 {
-    margin: 10px 0 0;
+    margin: 8px 0 0;
     color: var(--primary);
-    font-size: 34px;
+    font-size: 30px;
     line-height: 1.08;
-    max-width: 460px;
+    max-width: 300px;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.1em;
     font-weight: 800;
     text-wrap: balance;
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
@@ -736,8 +738,8 @@
   .welcome-modal p {
     margin: 0;
     color: #4f6763;
-    line-height: 1.6;
-    max-width: 420px;
+    line-height: 1.7;
+    max-width: 280px;
   }
 
   .welcome-modal .primary-btn {
@@ -1022,7 +1024,7 @@
     }
 
     .welcome-modal h2 {
-      font-size: 28px;
+      font-size: 26px;
       letter-spacing: 0.08em;
     }
   }
