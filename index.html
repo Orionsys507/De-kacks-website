@@ -230,6 +230,23 @@
     position: relative;
   }
 
+  .step-flow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 16px;
+  }
+
+  .step-pill {
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #eef6f3;
+    border: 1px solid #d2e4dd;
+    color: #35514f;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
   .brand-logo {
     width: 76px;
     height: 76px;
@@ -270,18 +287,18 @@
     display: block;
     margin-top: 12px;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 15px;
     color: var(--primary-2);
   }
 
   input, select {
     width: 100%;
-    padding: 12px 14px;
+    padding: 14px 16px;
     margin-top: 6px;
     border-radius: 14px;
     border: 1px solid #c8ddd7;
     background: linear-gradient(180deg, #fbfffe, #f6fbf9);
-    font-size: 14px;
+    font-size: 16px;
     color: var(--text);
     transition: all 0.2s ease;
   }
@@ -295,14 +312,21 @@
 
   button {
     width: 100%;
-    padding: 12px 14px;
+    padding: 14px 16px;
     margin-top: 12px;
     border: none;
     border-radius: 14px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 16px;
     cursor: pointer;
     transition: transform 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease, filter 0.14s ease;
+  }
+
+  .helper-note {
+    margin-top: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #48635f;
   }
 
   button:hover {
@@ -1015,6 +1039,12 @@
     <span class="weather-glow"></span>
   </div>
   <div class="container">
+    <div class="step-flow">
+      <div class="step-pill">Step 1 Guest Info</div>
+      <div class="step-pill">Step 2 Pool Calendar</div>
+      <div class="step-pill">Step 3 Booking Form</div>
+      <div class="step-pill">Step 4 Quotation</div>
+    </div>
     <div class="brand-head">
       <img src="./logo.png" alt="Dekack logo" class="brand-logo" />
       <div class="brand-text">
@@ -1094,6 +1124,7 @@
 
     <label for="date">Check-in Date:</label>
     <input type="date" id="date" onchange="checkDateAvailability()" />
+    <div class="helper-note">Tap a date from the calendar first. The form will use that date as your check-in date.</div>
 
     <label for="preferStay">Prefer to Stay:</label>
     <select id="preferStay">
@@ -1101,21 +1132,22 @@
       <option value="overnight">Over Night</option>
       <option value="day-night">Whole Day and Night</option>
     </select>
+    <div class="helper-note">Choose the type of stay. The time will adjust automatically.</div>
     <input type="hidden" id="stayDays" value="1" />
 
     <label for="checkInTime">Check-in Time:</label>
     <input type="time" id="checkInTime" value="08:00" />
 
-    <label for="checkOutDate">Check-out Date:</label>
-    <input type="date" id="checkOutDate" readonly />
-
-    <label for="checkOutTime">Check-out Time:</label>
-    <input type="time" id="checkOutTime" value="17:00" />
+    <label for="bookingDateRangeDisplay">Booking Schedule:</label>
+    <input type="text" id="bookingDateRangeDisplay" readonly />
+    <input type="hidden" id="checkOutDate" />
+    <input type="hidden" id="checkOutTime" value="17:00" />
 
     <div id="checkoutPreview" style="margin-top:10px;color:#1f3a5f;font-weight:600;"></div>
 
     <label for="guests">Total Guests:</label>
     <input type="number" id="guests" min="1" value="1" />
+    <div class="helper-note">Enter everyone included in the booking, even if some will not use a room.</div>
 
     <label for="roomHours">Room Usage Hours (minimum 12 hours):</label>
     <input type="number" id="roomHours" min="12" step="1" value="12" />
@@ -1143,6 +1175,7 @@
     <div id="roomSelectionSection" style="display:none;">
       <h3>Room Accommodation (Up to 6 selections)</h3>
       <div id="availabilityInfo" style="margin:8px 0 12px;color:#1f3a5f;font-weight:600;"></div>
+      <div class="helper-note">Room booking is optional. If you only want the pool, leave this section off.</div>
 
       <label for="roomGuests">Guests Staying in Rooms:</label>
       <input type="number" id="roomGuests" min="0" value="1" />
@@ -1232,6 +1265,7 @@
 
     <div id="poolSection" style="display:none;">
       <h3>Private Pool Access</h3>
+      <div class="helper-note">Pool booking is optional. If the pool is full, rooms may still be available.</div>
       <select id="pool-select">
         <option value="0">None</option>
         <option value="4800">Day Tour (8:00 AM - 5:00 PM) - PHP 4,800</option>
@@ -1992,7 +2026,7 @@
       const guestName = getGuestNameValue() || "Not yet set";
       const contact = getContactNumberValue() || "Not yet set";
       const selectedDate = document.getElementById("date").value;
-      const dateLabel = selectedDate ? formatDateLong(selectedDate) : "Choose a date from the calendar";
+      const dateLabel = document.getElementById("bookingDateRangeDisplay").value || (selectedDate ? formatDateLong(selectedDate) : "Choose a date from the calendar");
       const stayLabel = document.getElementById("preferStay").selectedOptions[0]?.text || "Day";
       const totalGuests = Math.max(0, parseInt(document.getElementById("guests").value, 10) || 0);
       const roomGuests = Math.max(0, parseInt(document.getElementById("roomGuests").value, 10) || 0);
@@ -2250,7 +2284,7 @@
       const bookings = Array.isArray(sources) ? sources : [];
 
       days.forEach((day) => {
-        const usedRooms = { couple: 0, deluxe: 0, barkada: 0, vip: 0, mattress: 0 };
+        const usedRooms = { couple: 0, attic: 0, deluxe: 0, barkada: 0, vip: 0, mattress: 0 };
         let usedPool = 0;
 
         bookings.forEach((booking) => {
@@ -2323,13 +2357,13 @@
 
       for (const type in requestedRooms) {
         if (requestedRooms[type] > availability.rooms[type]) {
-          return `Not enough ${ROOM_TYPE_LABELS[type] || type} availability for your selected schedule. Available: ${Math.max(0, availability.rooms[type])}.`;
+          return `Room accommodation is not enough for ${ROOM_TYPE_LABELS[type] || type}. Available now: ${Math.max(0, availability.rooms[type])}. You can still continue with pool only, or choose another available room type.`;
         }
       }
 
       const needsPool = (poolDetails.baseCost > 0) || (specialEventDetails && specialEventDetails.selected);
       if (needsPool && availability.poolRemaining <= 0) {
-        return "Pool is already booked on one or more days of your selected stay. You can still book rooms without pool.";
+        return "Pool is not available on one or more selected schedule days. You can still book available rooms or accommodation without the pool.";
       }
 
       return "";
@@ -2341,12 +2375,14 @@
       const checkInTime = document.getElementById("checkInTime").value || "08:00";
       const preview = document.getElementById("checkoutPreview");
       const checkOutDateInput = document.getElementById("checkOutDate");
+      const dateRangeDisplay = document.getElementById("bookingDateRangeDisplay");
       const poolDetails = getPoolDetails(stayDays, getSpecialEventDetails());
       if (!getSpecialEventDetails().selected) poolDetails.mode = getPreferredStayMode();
 
       if (!checkInDate || stayDays < 1) {
         preview.textContent = "";
         checkOutDateInput.value = "";
+        if (dateRangeDisplay) dateRangeDisplay.value = "";
         return;
       }
 
@@ -2366,7 +2402,10 @@
       document.getElementById("checkInTime").value = schedule.checkInTime;
       document.getElementById("checkOutTime").value = schedule.checkOutTime;
       const stayLabel = document.getElementById("preferStay").selectedOptions[0]?.text || "Day";
-      preview.textContent = `Stay: ${stayLabel} | Check-in: ${checkInReadable} ${schedule.checkInTime} | Check-out: ${checkOutReadable} ${schedule.checkOutTime}`;
+      if (dateRangeDisplay) {
+        dateRangeDisplay.value = `${checkInReadable} ${schedule.checkInTime} - ${checkOutReadable} ${schedule.checkOutTime}`;
+      }
+      preview.textContent = `Stay: ${stayLabel} | Schedule: ${checkInReadable} ${schedule.checkInTime} - ${checkOutReadable} ${schedule.checkOutTime}`;
     }
 
     function initializeDatePicker() {
@@ -2394,7 +2433,7 @@
       if (!checkInDate || stayDays < 1) return;
     }
 
-    async function savePendingBooking(name, contactNumber, checkInDate, stayDays, guests, roomGuests, checkInTime, checkOutTime, rooms, roomHours, poolDetails, cateringDetails, hallDetails, specialEventDetails) {
+    async function savePendingBooking(reservationReference, name, contactNumber, checkInDate, stayDays, guests, roomGuests, checkInTime, checkOutTime, rooms, roomHours, poolDetails, cateringDetails, hallDetails, specialEventDetails) {
       const error = validateSelectionAgainstAvailability(checkInDate, stayDays, rooms, poolDetails, specialEventDetails);
       if (error) return false;
 
@@ -2408,6 +2447,7 @@
       const bookingId = `pending_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       const booking = {
         id: bookingId,
+        reservationReference,
         name,
         contactNumber,
         guests,
@@ -2776,7 +2816,11 @@
       if (!showRooms) {
         resetRoomSlotVisibility();
         document.getElementById("mattressQuantity").value = "0";
+        document.getElementById("roomGuests").value = "0";
       } else {
+        if ((parseInt(document.getElementById("roomGuests").value, 10) || 0) === 0) {
+          document.getElementById("roomGuests").value = document.getElementById("guests").value || "1";
+        }
         syncRoomSlotVisibility();
       }
 
@@ -3168,6 +3212,8 @@
       const stayDays = parseInt(document.getElementById("stayDays").value, 10) || 0;
       const guests = parseInt(document.getElementById("guests").value, 10) || 0;
       const roomGuests = Math.max(0, parseInt(document.getElementById("roomGuests").value, 10) || 0);
+      const wantsRoomAccommodation = document.getElementById("showRoomsCheckbox").checked;
+      const effectiveRoomGuests = wantsRoomAccommodation ? roomGuests : 0;
       const roomHours = getRoomUsageHours();
       const specialEventDetails = getSpecialEventDetails();
       const stayLabel = document.getElementById("preferStay").selectedOptions[0]?.text || "Day";
@@ -3197,7 +3243,7 @@
         return;
       }
 
-      if (roomGuests > guests) {
+      if (effectiveRoomGuests > guests) {
         alert("Guests staying in rooms cannot be higher than total guests.");
         return;
       }
@@ -3211,7 +3257,7 @@
         }
 
         const totalCapacity = rooms.reduce((sum, room) => sum + room.pax, 0);
-        if (roomGuests > 0 && totalCapacity < roomGuests) {
+        if (effectiveRoomGuests > 0 && totalCapacity < effectiveRoomGuests) {
           alert("Selected rooms cannot accommodate the guests staying in rooms.");
           return;
         }
@@ -3262,6 +3308,7 @@
         ...room,
         computedPrice: specialEventDetails.selected ? 0 : (room.type === "mattress" ? room.price : computeRoomCost(room.price, roomHours)),
       }));
+      const reservationReference = `DKR-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
       const totalRoomCost = roomLineItems.reduce((sum, room) => sum + room.computedPrice, 0);
       const totalCost = specialEventDetails.baseCost + totalRoomCost + poolDetails.computedCost + cateringDetails.totalCost + hallDetails.cost;
       const downpayment = totalCost * 0.2;
@@ -3302,9 +3349,10 @@
           <div class="quote-body">
             <div class="quote-grid">
               <div class="quote-item"><b>Guest Name:</b><br>${name}</div>
+              <div class="quote-item"><b>Reference No.:</b><br>${reservationReference}</div>
               <div class="quote-item"><b>Contact Number:</b><br>${contactNumber}</div>
               <div class="quote-item"><b>Total Guests:</b><br>${guests}</div>
-              <div class="quote-item"><b>Room Guests:</b><br>${roomGuests}</div>
+              <div class="quote-item"><b>Room Guests:</b><br>${effectiveRoomGuests}</div>
               <div class="quote-item"><b>Stay Preference:</b><br>${stayLabel}</div>
               <div class="quote-item"><b>Room Usage:</b><br>${roomHours} hour(s) ${promoFreeHours > 0 ? `(Promo: 24 hours free, billed ${billableHours} hours)` : `(12h base + ${extraHours} extra)`}</div>
               <div class="quote-item"><b>Check-in:</b><br>${formattedCheckInDate} ${schedule.checkInTime}</div>
@@ -3362,10 +3410,12 @@
             </div>
 
             <div class="payment-box">
+              <p><strong>Reference No.:</strong> ${reservationReference}</p>
               <p><strong>Required Downpayment (20%):</strong> PHP ${downpayment.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
               <p>Payment Method: <strong>GCash</strong></p>
               <p>Account Number: <strong>09511720299</strong></p>
-              <p>Please send your payment screenshot for confirmation.</p>
+              <p>Please send your payment screenshot for confirmation and include your reference number.</p>
+              <p><strong>Important:</strong> Your date is not secured until payment is made and confirmed.</p>
               <p id="reservationStatus"><strong>Status:</strong> Quotation generated. Click "Reserve Now" to submit for admin approval.</p>
             </div>
 
@@ -3378,12 +3428,13 @@
 
       pendingReservation = {
         name,
+        reservationReference,
         contactNumber,
         checkInDate,
         stayDays,
         stayLabel,
         guests,
-        roomGuests,
+        roomGuests: effectiveRoomGuests,
         checkInTime: schedule.checkInTime,
         checkOutTime: schedule.checkOutTime,
         rooms: roomLineItems,
@@ -3405,6 +3456,7 @@
       }
 
       const {
+        reservationReference,
         name,
         contactNumber,
         checkInDate,
@@ -3428,6 +3480,7 @@
       }
 
       const saved = await savePendingBooking(
+        reservationReference,
         name,
         contactNumber,
         checkInDate,
@@ -3451,7 +3504,7 @@
 
       const statusEl = document.getElementById("reservationStatus");
       if (statusEl) {
-        statusEl.innerHTML = "<strong>Status:</strong> Your reservation is pending. The selected date can still be booked by others until payment is made and confirmed.";
+        statusEl.innerHTML = `<strong>Status:</strong> Your reservation is pending. Reference No.: ${reservationReference}. The selected date can still be booked by others until payment is made and confirmed.`;
       }
       const reserveBtn = document.getElementById("reserveNowBtn");
       if (reserveBtn) {
@@ -3459,7 +3512,7 @@
         reserveBtn.disabled = true;
       }
 
-      alert("Your reservation is pending. The selected date can still be booked by others until payment is made and confirmed.");
+      alert(`Your reservation is pending.\nReference No.: ${reservationReference}\nThe selected date can still be booked by others until payment is made and confirmed.`);
       pendingReservation = null;
       checkDateAvailability();
     }
@@ -3985,6 +4038,7 @@
           output += `
             <div>
               <p><strong>${index + 1}. ${booking.name}</strong> <span style="color:#b26a00;font-weight:700;">(Pending)</span></p>
+              <p>Reference No.: ${booking.reservationReference || "N/A"}</p>
               <p>Contact Number: ${booking.contactNumber || "N/A"}</p>
               <p>Stay: ${getBookingStayLabel(booking)}</p>
               <p>Check-in: ${formattedCheckIn} ${booking.checkInTime || "08:00"}</p>
@@ -4042,6 +4096,7 @@
           output += `
             <div>
               <p><strong>${index + 1}. ${booking.name}</strong> <span style="color:#1f7a3f;font-weight:700;">(Approved)</span></p>
+              <p>Reference No.: ${booking.reservationReference || "N/A"}</p>
               <p>Contact Number: ${booking.contactNumber || "N/A"}</p>
               <p>Stay: ${getBookingStayLabel(booking)}</p>
               <p>Check-in: ${formattedCheckIn} ${booking.checkInTime || "08:00"}</p>
