@@ -692,6 +692,43 @@
     padding-top: 4px;
   }
 
+  .booking-summary-card {
+    margin-bottom: 18px;
+    padding: 16px;
+    border-radius: 20px;
+    border: 1px solid #d8e7df;
+    background: linear-gradient(135deg, rgba(255, 247, 228, 0.96), rgba(234, 248, 244, 0.96));
+    box-shadow: 0 16px 30px rgba(15, 74, 82, 0.08);
+  }
+
+  .booking-summary-card h3 {
+    margin: 0 0 10px;
+  }
+
+  .booking-summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .booking-summary-item {
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(203, 223, 215, 0.9);
+    font-size: 13px;
+    color: #35514f;
+  }
+
+  .booking-summary-item strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--primary);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
   .availability-step-card {
     margin-bottom: 18px;
     border-radius: 24px;
@@ -954,6 +991,10 @@
     .quote-grid {
       grid-template-columns: 1fr;
     }
+
+    .booking-summary-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
 </head>
@@ -1039,6 +1080,17 @@
     </div>
 
     <div id="bookingFormPanel" class="booking-form-panel hidden">
+    <div class="booking-summary-card">
+      <h3>Booking Summary</h3>
+      <div id="bookingSummary" class="booking-summary-grid">
+        <div class="booking-summary-item"><strong>Guest</strong>Not yet set</div>
+        <div class="booking-summary-item"><strong>Date</strong>Choose a date from the calendar</div>
+        <div class="booking-summary-item"><strong>Stay</strong>Day</div>
+        <div class="booking-summary-item"><strong>Guests</strong>1 guest</div>
+        <div class="booking-summary-item"><strong>Rooms</strong>No rooms selected yet</div>
+        <div class="booking-summary-item"><strong>Pool</strong>Based on your stay preference</div>
+      </div>
+    </div>
 
     <label for="date">Check-in Date:</label>
     <input type="date" id="date" onchange="checkDateAvailability()" />
@@ -1753,12 +1805,21 @@
       initializeAvailabilityMonth();
       renderAvailabilityCalendar();
       updateRoomGuide();
+      updateLiveBookingSummary();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function continueToQuotationForm() {
       document.getElementById("availabilityStepPanel").classList.add("hidden");
       document.getElementById("bookingFormPanel").classList.remove("hidden");
+      if (selectedAvailabilityDate) {
+        document.getElementById("date").value = selectedAvailabilityDate;
+      }
+      syncStayPreferenceFields();
+      applyPoolScheduleRules();
+      updateCheckoutPreview();
+      checkDateAvailability();
+      updateLiveBookingSummary();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -1924,6 +1985,37 @@
       `;
     }
 
+    function updateLiveBookingSummary() {
+      const summary = document.getElementById("bookingSummary");
+      if (!summary) return;
+
+      const guestName = getGuestNameValue() || "Not yet set";
+      const contact = getContactNumberValue() || "Not yet set";
+      const selectedDate = document.getElementById("date").value;
+      const dateLabel = selectedDate ? formatDateLong(selectedDate) : "Choose a date from the calendar";
+      const stayLabel = document.getElementById("preferStay").selectedOptions[0]?.text || "Day";
+      const totalGuests = Math.max(0, parseInt(document.getElementById("guests").value, 10) || 0);
+      const roomGuests = Math.max(0, parseInt(document.getElementById("roomGuests").value, 10) || 0);
+      const selectedRooms = getSelectedRooms();
+      const roomNames = selectedRooms.length > 0
+        ? selectedRooms.map((room) => room.text.split(" - ")[0]).join(", ")
+        : "No rooms selected yet";
+      const poolValue = parseInt(document.getElementById("pool-select").value, 10) || 0;
+      let poolLabel = "No pool selected";
+      if (poolValue === 4800) poolLabel = "Day Tour Pool";
+      if (poolValue === 6500) poolLabel = "Overnight Pool";
+      if (poolValue === 10000) poolLabel = "Whole Day and Night Pool";
+
+      summary.innerHTML = `
+        <div class="booking-summary-item"><strong>Guest</strong>${guestName}<br>${contact}</div>
+        <div class="booking-summary-item"><strong>Date</strong>${dateLabel}</div>
+        <div class="booking-summary-item"><strong>Stay</strong>${stayLabel}</div>
+        <div class="booking-summary-item"><strong>Guests</strong>${totalGuests} total | ${roomGuests} staying in rooms</div>
+        <div class="booking-summary-item"><strong>Rooms</strong>${roomNames}</div>
+        <div class="booking-summary-item"><strong>Pool</strong>${poolLabel}</div>
+      `;
+    }
+
     function getBookingStayLabel(booking) {
       if (booking && booking.stayLabel) return booking.stayLabel;
       const mode = booking && booking.poolMode ? booking.poolMode : getPreferredStayMode();
@@ -2029,6 +2121,8 @@
 
     function showAvailabilityDateDetails(dateString) {
       selectedAvailabilityDate = dateString;
+      const dateInput = document.getElementById("date");
+      if (dateInput) dateInput.value = dateString;
       const detailsEl = document.getElementById("availabilityDateDetails");
       if (!detailsEl) return;
 
@@ -2051,6 +2145,9 @@
         <p>${redDateNote}</p>
       `;
 
+      updateCheckoutPreview();
+      checkDateAvailability();
+      updateLiveBookingSummary();
       renderAvailabilityCalendar();
     }
 
@@ -3061,6 +3158,7 @@
       refreshRoomSelectionAvailability();
       updateAccommodationPanels();
       updateRoomGuide();
+      updateLiveBookingSummary();
     }
 
     function generateQuotation() {
@@ -4117,6 +4215,7 @@
       applyPoolScheduleRules();
       refreshRoomSelectionAvailability();
       updateRoomGuide();
+      updateLiveBookingSummary();
       document.getElementById("showRoomsCheckbox").addEventListener("change", updateAccommodationPanels);
       document.getElementById("showPoolCheckbox").addEventListener("change", updateAccommodationPanels);
       document.getElementById("showSpecialEventCheckbox").addEventListener("change", () => {
@@ -4136,22 +4235,32 @@
       applyPoolScheduleRules();
       updateCheckoutPreview();
       checkDateAvailability();
+      updateLiveBookingSummary();
     });
     document.getElementById("date").addEventListener("change", () => {
       applyPoolScheduleRules();
       updateCheckoutPreview();
+      updateLiveBookingSummary();
     });
-    document.getElementById("checkInTime").addEventListener("change", updateCheckoutPreview);
-    document.getElementById("checkOutTime").addEventListener("change", updateCheckoutPreview);
+    document.getElementById("checkInTime").addEventListener("change", () => {
+      updateCheckoutPreview();
+      updateLiveBookingSummary();
+    });
+    document.getElementById("checkOutTime").addEventListener("change", () => {
+      updateCheckoutPreview();
+      updateLiveBookingSummary();
+    });
     document.getElementById("stayDays").addEventListener("change", () => {
       applyPoolScheduleRules();
       updateCheckoutPreview();
       checkDateAvailability();
+      updateLiveBookingSummary();
     });
     document.getElementById("pool-select").addEventListener("change", () => {
       syncPreferenceFromPoolSelection();
       applyPoolScheduleRules();
       checkDateAvailability();
+      updateLiveBookingSummary();
     });
     document.getElementById("availabilityMonth").addEventListener("change", () => {
       selectedAvailabilityDate = "";
@@ -4168,13 +4277,18 @@
       document.getElementById("roomGuests").value = document.getElementById("guests").value || "0";
       updateHallFields();
       updateRoomGuide();
+      updateLiveBookingSummary();
     });
-    document.getElementById("roomGuests").addEventListener("input", updateRoomGuide);
+    document.getElementById("roomGuests").addEventListener("input", () => {
+      updateRoomGuide();
+      updateLiveBookingSummary();
+    });
     document.querySelectorAll(".room-select").forEach((select) => {
       select.addEventListener("change", () => {
         checkDateAvailability();
         refreshRoomSelectionAvailability();
         updateRoomGuide();
+        updateLiveBookingSummary();
       });
     });
     document.getElementById("addRoomButton").addEventListener("click", revealNextRoomSlot);
@@ -4182,7 +4296,10 @@
       refreshRoomSelectionAvailability();
       checkDateAvailability();
       updateRoomGuide();
+      updateLiveBookingSummary();
     });
+    document.getElementById("guestName").addEventListener("input", updateLiveBookingSummary);
+    document.getElementById("contactNumber").addEventListener("input", updateLiveBookingSummary);
   </script>
 </body>
 </html>
