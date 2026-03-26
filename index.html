@@ -616,9 +616,14 @@
     border: 1px solid rgba(255, 255, 255, 0.7);
     border-radius: 28px;
     box-shadow: 0 28px 70px rgba(5, 38, 46, 0.24);
-    padding: 26px;
+    padding: 28px 28px 30px;
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
   }
 
   .welcome-modal::before {
@@ -650,16 +655,23 @@
   }
 
   .welcome-modal h2 {
-    margin: 18px 0 10px;
+    margin: 10px 0 0;
     color: var(--primary);
     font-size: 32px;
-    line-height: 1.1;
+    line-height: 1.2;
+    max-width: 440px;
   }
 
   .welcome-modal p {
     margin: 0;
     color: #4f6763;
     line-height: 1.6;
+    max-width: 420px;
+  }
+
+  .welcome-modal .primary-btn {
+    width: min(280px, 100%);
+    margin-top: 4px;
   }
 
   .pre-entry-card {
@@ -2221,9 +2233,7 @@
       if (mode === "day-tour") {
         segments.push("am");
       } else if (mode === "overnight") {
-        if (booking.checkInDate === targetDate) segments.push("pm");
-        if (booking.checkOutDate === targetDate) segments.push("am");
-        if (booking.checkInDate < targetDate && booking.checkOutDate > targetDate) segments.push("am", "pm");
+        if (booking.checkInDate <= targetDate && booking.checkOutDate > targetDate) segments.push("pm");
       } else if (mode === "day-night") {
         if (booking.checkInDate === targetDate) segments.push("am", "pm");
         if (booking.checkInDate < targetDate && booking.checkOutDate > targetDate) segments.push("am", "pm");
@@ -2254,10 +2264,8 @@
         }
 
         if (mode === "overnight") {
-          if (date === checkInDate) segments.push({ date, segment: "pm" });
-          if (date === resolvedCheckOutDate) segments.push({ date, segment: "am" });
-          if (date > checkInDate && date < resolvedCheckOutDate) {
-            segments.push({ date, segment: "am" }, { date, segment: "pm" });
+          if (date < resolvedCheckOutDate) {
+            segments.push({ date, segment: "pm" });
           }
           return;
         }
@@ -2400,7 +2408,7 @@
       if (summary.amStatus === "available" && summary.pmStatus === "available") {
         availablePools.push("Day Tour Pool");
       }
-      if (summary.pmStatus === "available" && nextDateSummary.amStatus === "available") {
+      if (summary.pmStatus === "available") {
         availablePools.push("Overnight Pool");
       }
       if (summary.amStatus === "available" && summary.pmStatus === "available" && nextDateSummary.amStatus === "available") {
