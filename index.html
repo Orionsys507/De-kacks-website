@@ -1195,9 +1195,6 @@
     <input type="number" id="guests" min="1" value="1" />
     <div class="helper-note">Enter everyone included in the booking, even if some will not use a room.</div>
 
-    <label for="roomHours">Room Usage Hours (minimum 12 hours):</label>
-    <input type="number" id="roomHours" min="12" step="1" value="12" />
-
     <div style="margin-top:14px;padding:12px;border:1px solid #d7e4f2;border-radius:10px;background:#f8fbff;">
       <div style="font-weight:700;color:#0f3558;font-size:13px;margin-bottom:8px;">Accommodation Selection</div>
       <label style="display:flex;align-items:center;gap:8px;margin:0 0 8px;font-weight:600;cursor:pointer;">
@@ -1225,6 +1222,17 @@
 
       <label for="roomGuests">Guests Staying in Rooms:</label>
       <input type="number" id="roomGuests" min="0" value="1" />
+      <label for="roomHours">How Many Day(s) Will You Use the Rooms?</label>
+      <select id="roomHours">
+        <option value="1">1 day</option>
+        <option value="2">2 days</option>
+        <option value="3">3 days</option>
+        <option value="4">4 days</option>
+        <option value="5">5 days</option>
+        <option value="6">6 days</option>
+        <option value="7">7 days</option>
+      </select>
+      <div class="helper-note">Room promo: if room booking is more than 1 day, 1 day is free.</div>
       <div id="roomGuideInfo" class="room-guide-card">
         <strong>Room Guide</strong>
         <p>Tell us how many guests will stay in rooms so we can suggest how many rooms you may need.</p>
@@ -2711,6 +2719,7 @@
         Number(poolDetails.computedCost || 0) +
         Number(cateringDetails.totalCost || 0) +
         Number(hallDetails.cost || 0);
+      const roomPromoDetails = getRoomPromoDetails(roomHours);
       const bookingId = `pending_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       const booking = {
         id: bookingId,
@@ -2728,6 +2737,9 @@
         occupiedDates: schedule.occupiedDates,
         rooms,
         roomHours,
+        roomStayDays: roomPromoDetails.requestedDays,
+        roomBillableDays: roomPromoDetails.billableDays,
+        roomPromoFreeDays: roomPromoDetails.freeDays,
         specialEventSelected: specialEventDetails.selected,
         specialEventLabel: specialEventDetails.label,
         specialEventHours: specialEventDetails.hours,
@@ -2918,17 +2930,27 @@
     }
 
     function getRoomUsageHours() {
-      const raw = parseInt(document.getElementById("roomHours").value, 10) || 12;
-      return Math.max(12, raw);
+      const raw = parseInt(document.getElementById("roomHours").value, 10) || 1;
+      return Math.max(1, raw);
     }
 
     function computeRoomCost(basePrice, roomHours) {
-      const hours = Math.max(12, roomHours || 12);
-      const promoFreeHours = hours >= 48 ? 24 : 0;
-      const billableHours = Math.max(12, hours - promoFreeHours);
-      const extraHours = Math.max(0, billableHours - 12);
-      const perHourRate = basePrice / 12;
-      return basePrice + extraHours * perHourRate;
+      const roomDays = Math.max(1, roomHours || 1);
+      const freeDays = roomDays > 1 ? 1 : 0;
+      const billableDays = Math.max(1, roomDays - freeDays);
+      return basePrice * billableDays;
+    }
+
+    function getRoomPromoDetails(roomDays) {
+      const requestedDays = Math.max(1, roomDays || 1);
+      const freeDays = requestedDays > 1 ? 1 : 0;
+      const billableDays = Math.max(1, requestedDays - freeDays);
+      return {
+        requestedDays,
+        freeDays,
+        billableDays,
+        promoApplied: freeDays > 0,
+      };
     }
 
     function getPoolDetails(stayDays, specialEventDetails = null) {
@@ -3319,6 +3341,7 @@
         : subtotal * 0.2;
       const fullyPaid = !!booking.fullyPaid;
       const remainingBalance = fullyPaid ? 0 : Math.max(0, total - downpayment);
+      const roomPromoDetails = getRoomPromoDetails(Number(booking.roomStayDays || booking.roomHours || 1));
       return {
         specialEventTotal,
         roomTotal,
@@ -3333,6 +3356,7 @@
         downpayment,
         remainingBalance,
         fullyPaid,
+        roomPromoDetails,
       };
     }
 
@@ -3364,7 +3388,7 @@
       if (specialEventDetails.selected) {
         stayDaysInput.value = "1";
         stayDaysInput.disabled = true;
-        roomHoursInput.value = String(SPECIAL_EVENT_HOURS);
+        roomHoursInput.value = "1";
         roomHoursInput.disabled = true;
         poolSelect.value = "0";
         poolSelect.disabled = true;
@@ -3432,7 +3456,7 @@
       document.getElementById("checkOutTime").value = "17:00";
       document.getElementById("guests").value = "1";
       document.getElementById("roomGuests").value = "1";
-      document.getElementById("roomHours").value = "12";
+      document.getElementById("roomHours").value = "1";
       document.getElementById("pool-select").value = "0";
       document.getElementById("specialEventSelect").value = "0";
       document.getElementById("specialEventCateringMode").value = "none";
@@ -3587,9 +3611,7 @@
         alert(selectionError);
         return;
       }
-      const promoFreeHours = roomHours >= 48 ? 24 : 0;
-      const billableHours = Math.max(12, roomHours - promoFreeHours);
-      const extraHours = Math.max(0, billableHours - 12);
+      const roomPromoDetails = getRoomPromoDetails(roomHours);
       const roomLineItems = rooms.map((room) => ({
         ...room,
         computedPrice: specialEventDetails.selected ? 0 : (room.type === "mattress" ? room.price : computeRoomCost(room.price, roomHours)),
@@ -3640,7 +3662,7 @@
               <div class="quote-item"><b>Total Guests:</b><br>${guests}</div>
               <div class="quote-item"><b>Room Guests:</b><br>${effectiveRoomGuests}</div>
               <div class="quote-item"><b>Stay Preference:</b><br>${stayLabel}</div>
-              <div class="quote-item"><b>Room Usage:</b><br>${roomHours} hour(s) ${promoFreeHours > 0 ? `(Promo: 24 hours free, billed ${billableHours} hours)` : `(12h base + ${extraHours} extra)`}</div>
+              <div class="quote-item"><b>Room Stay:</b><br>${roomPromoDetails.requestedDays} day(s)${roomLineItems.length > 0 && roomPromoDetails.promoApplied ? ` (Promo: ${roomPromoDetails.freeDays} day free, billed ${roomPromoDetails.billableDays} day(s))` : ""}</div>
               <div class="quote-item"><b>Check-in:</b><br>${formattedCheckInDate} ${schedule.checkInTime}</div>
               <div class="quote-item"><b>Check-out:</b><br>${formattedCheckOutDate} ${schedule.checkOutTime}</div>
             </div>
@@ -3659,6 +3681,11 @@
                 <div>${specialEventDetails.selected ? "Included" : `PHP ${room.computedPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}</div>
               </div>
             `).join("") : '<div class="quote-row"><div>No rooms selected.</div><div>PHP 0.00</div></div>'}
+            ${roomLineItems.length > 0 && roomPromoDetails.promoApplied ? `
+            <div class="quote-row">
+              <div><strong>Room Promo</strong><br>Requested ${roomPromoDetails.requestedDays} day(s), billed ${roomPromoDetails.billableDays} day(s), free ${roomPromoDetails.freeDays} day.</div>
+              <div>FREE PROMO</div>
+            </div>` : ""}
 
             <div class="quote-row">
               <div><strong>Total Room Cost</strong></div>
@@ -3727,6 +3754,9 @@
         checkOutTime: schedule.checkOutTime,
         rooms: roomLineItems,
         roomHours,
+        roomStayDays: roomPromoDetails.requestedDays,
+        roomBillableDays: roomPromoDetails.billableDays,
+        roomPromoFreeDays: roomPromoDetails.freeDays,
         poolDetails,
         cateringDetails,
         hallDetails,
@@ -3843,6 +3873,7 @@
 
       const cateringDetails = getCateringDetails();
       const hallDetails = getFunctionHallDetails(cateringDetails, specialEventDetails);
+      const roomPromoDetails = getRoomPromoDetails(roomHours);
       const roomLineItems = rooms.map((room) => ({
         ...room,
         computedPrice: specialEventDetails.selected ? 0 : (room.type === "mattress" ? room.price : computeRoomCost(room.price, roomHours)),
@@ -3910,7 +3941,7 @@
         `Contact Number: ${contactNumber || "N/A"}`,
         `Guests: ${guests}`,
         `Stay Preference: ${document.getElementById("preferStay").selectedOptions[0]?.text || "Day"}`,
-        `Room Usage: ${roomHours} hour(s)`,
+        `Room Stay: ${roomPromoDetails.requestedDays} day(s)${roomPromoDetails.promoApplied ? ` (${roomPromoDetails.freeDays} day free promo)` : ""}`,
       ];
       const rightDetails = [
         `Check-in: ${formattedCheckInDate} ${schedule.checkInTime}`,
@@ -3979,6 +4010,10 @@
           drawRow(`${room.displayLabel || `Room ${room.slot}`}: ${roomName}`, specialEventDetails.selected ? "Included" : money(room.computedPrice), y);
           y += rowHeight;
         });
+        if (!specialEventDetails.selected && roomPromoDetails.promoApplied) {
+          drawRow(`Room Promo: ${roomPromoDetails.freeDays} day free`, `Requested ${roomPromoDetails.requestedDays} day(s), billed ${roomPromoDetails.billableDays} day(s)`, y);
+          y += rowHeight;
+        }
       }
       drawRow("Total Room Cost", money(totalRoomCost), y, true);
       y += 9;
@@ -4339,7 +4374,7 @@
               <p>Check-out: ${formattedCheckOut} ${booking.checkOutTime || "17:00"}</p>
               <p>Guests: ${booking.guests}</p>
               <p>Room Guests: ${booking.roomGuests || booking.guests || 0}</p>
-              <p>Room Usage: ${booking.roomHours || 12} hour(s)</p>
+              <p>Room Stay: ${booking.roomStayDays || booking.roomHours || 1} day(s)${Number(booking.roomPromoFreeDays || 0) > 0 ? ` (${booking.roomPromoFreeDays} day free promo)` : ""}</p>
               <p>Special Event: ${booking.specialEventSelected ? `${booking.specialEventLabel} - PHP ${Number(booking.specialEventCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${booking.specialEventCateringMode === "with" ? "With cater" : "Non-cater"})` : "None"}</p>
               <p>Rooms: ${
                 Array.isArray(booking.rooms) && booking.rooms.length > 0
@@ -4397,7 +4432,7 @@
               <p>Check-out: ${formattedCheckOut} ${booking.checkOutTime || "17:00"}</p>
               <p>Guests: ${booking.guests}</p>
               <p>Room Guests: ${booking.roomGuests || booking.guests || 0}</p>
-              <p>Room Usage: ${booking.roomHours || 12} hour(s)</p>
+              <p>Room Stay: ${booking.roomStayDays || booking.roomHours || 1} day(s)${Number(booking.roomPromoFreeDays || 0) > 0 ? ` (${booking.roomPromoFreeDays} day free promo)` : ""}</p>
               <p>Special Event: ${booking.specialEventSelected ? `${booking.specialEventLabel} - PHP ${Number(booking.specialEventCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${booking.specialEventCateringMode === "with" ? "With cater" : "Non-cater"})` : "None"}</p>
               <p>Rooms: ${
                 Array.isArray(booking.rooms) && booking.rooms.length > 0
@@ -4627,6 +4662,9 @@
       applyPoolScheduleRules();
       updateCheckoutPreview();
       checkDateAvailability();
+      updateLiveBookingSummary();
+    });
+    document.getElementById("roomHours").addEventListener("change", () => {
       updateLiveBookingSummary();
     });
     document.getElementById("pool-select").addEventListener("change", () => {
