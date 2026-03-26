@@ -1222,17 +1222,20 @@
 
       <label for="roomGuests">Guests Staying in Rooms:</label>
       <input type="number" id="roomGuests" min="0" value="1" />
-      <label for="roomHours">How Many Day(s) Will You Use the Rooms?</label>
-      <select id="roomHours">
-        <option value="1">1 day</option>
-        <option value="2">2 days</option>
-        <option value="3">3 days</option>
-        <option value="4">4 days</option>
-        <option value="5">5 days</option>
-        <option value="6">6 days</option>
-        <option value="7">7 days</option>
-      </select>
-      <div class="helper-note">Room promo: if room booking is more than 1 day, 1 day is free.</div>
+      <div class="helper-note">Room rate is based on 12 hours per day.</div>
+      <div id="roomMultiDayWrap" class="hidden">
+        <label for="roomHours">How Many Day(s) Will You Use the Rooms?</label>
+        <select id="roomHours">
+          <option value="1">1 day</option>
+          <option value="2">2 days</option>
+          <option value="3">3 days</option>
+          <option value="4">4 days</option>
+          <option value="5">5 days</option>
+          <option value="6">6 days</option>
+          <option value="7">7 days</option>
+        </select>
+        <div class="helper-note">Room promo: if room booking is more than 1 day, 1 day is free.</div>
+      </div>
       <div id="roomGuideInfo" class="room-guide-card">
         <strong>Room Guide</strong>
         <p>Tell us how many guests will stay in rooms so we can suggest how many rooms you may need.</p>
@@ -1326,6 +1329,18 @@
         <option value="6500">Overnight Stay (Check-in from 6:00 PM, Check-out at 7:00 AM) - PHP 6,500</option>
         <option value="10000">Day and Night Tour - PHP 10,000 / day</option>
       </select>
+      <div id="poolMultiDayWrap" class="hidden">
+        <label for="stayDaysVisible">How Many Day(s) Will You Use the Pool?</label>
+        <select id="stayDaysVisible">
+          <option value="1">1 day</option>
+          <option value="2">2 days</option>
+          <option value="3">3 days</option>
+          <option value="4">4 days</option>
+          <option value="5">5 days</option>
+          <option value="6">6 days</option>
+          <option value="7">7 days</option>
+        </select>
+      </div>
     </div>
 
     <div id="specialEventSection" class="special-event-box" style="display:none;">
@@ -2019,6 +2034,7 @@
       const checkOutDate = checkOutDatePicker ? checkOutDatePicker.value : "";
       const stayMode = getPreferredStayMode();
       const stayDaysInput = document.getElementById("stayDays");
+      const stayDaysVisible = document.getElementById("stayDaysVisible");
       if (!checkInDate || !checkOutDate || !stayDaysInput) return;
 
       let diffDays = getDateDifferenceInDays(checkInDate, checkOutDate);
@@ -2028,6 +2044,35 @@
       } else {
         diffDays = Math.max(1, diffDays);
         stayDaysInput.value = String(diffDays);
+      }
+      if (stayDaysVisible) stayDaysVisible.value = stayDaysInput.value;
+      toggleMultiDaySelectors();
+    }
+
+    function toggleMultiDaySelectors() {
+      const checkInDate = document.getElementById("date").value;
+      const checkOutDate = document.getElementById("checkOutDatePicker").value;
+      const roomWrap = document.getElementById("roomMultiDayWrap");
+      const poolWrap = document.getElementById("poolMultiDayWrap");
+      const stayDaysInput = document.getElementById("stayDays");
+      const stayDaysVisible = document.getElementById("stayDaysVisible");
+      const roomHours = document.getElementById("roomHours");
+      const multiDay = !!checkInDate && !!checkOutDate && getDateDifferenceInDays(checkInDate, checkOutDate) >= 1;
+
+      if (roomWrap) roomWrap.classList.toggle("hidden", !multiDay);
+      if (poolWrap) poolWrap.classList.toggle("hidden", !multiDay);
+
+      if (!multiDay) {
+        if (roomHours) roomHours.value = "1";
+        if (stayDaysInput) stayDaysInput.value = "1";
+        if (stayDaysVisible) stayDaysVisible.value = "1";
+        return;
+      }
+
+      if (stayDaysVisible && stayDaysInput) stayDaysVisible.value = stayDaysInput.value || "1";
+      if (roomHours) {
+        const suggestedRoomDays = Math.max(1, getDateDifferenceInDays(checkInDate, checkOutDate));
+        roomHours.value = String(suggestedRoomDays);
       }
     }
 
@@ -3390,6 +3435,8 @@
         stayDaysInput.disabled = true;
         roomHoursInput.value = "1";
         roomHoursInput.disabled = true;
+        document.getElementById("stayDaysVisible").value = "1";
+        document.getElementById("stayDaysVisible").disabled = true;
         poolSelect.value = "0";
         poolSelect.disabled = true;
         hallSelect.value = "0";
@@ -3412,6 +3459,7 @@
       } else {
         stayDaysInput.disabled = false;
         roomHoursInput.disabled = false;
+        document.getElementById("stayDaysVisible").disabled = false;
         poolSelect.disabled = false;
         hallSelect.disabled = false;
         if (roomsCheckbox) roomsCheckbox.disabled = false;
@@ -3441,6 +3489,7 @@
       renderCateringChoices();
       updateHallFields();
       updateAccommodationPanels();
+      toggleMultiDaySelectors();
       checkDateAvailability();
       refreshRoomSelectionAvailability();
       updateRoomGuide();
@@ -3457,6 +3506,7 @@
       document.getElementById("guests").value = "1";
       document.getElementById("roomGuests").value = "1";
       document.getElementById("roomHours").value = "1";
+      document.getElementById("stayDaysVisible").value = "1";
       document.getElementById("pool-select").value = "0";
       document.getElementById("specialEventSelect").value = "0";
       document.getElementById("specialEventCateringMode").value = "none";
@@ -3494,6 +3544,7 @@
       checkDateAvailability();
       refreshRoomSelectionAvailability();
       updateAccommodationPanels();
+      toggleMultiDaySelectors();
       updateRoomGuide();
       updateLiveBookingSummary();
     }
@@ -3662,7 +3713,7 @@
               <div class="quote-item"><b>Total Guests:</b><br>${guests}</div>
               <div class="quote-item"><b>Room Guests:</b><br>${effectiveRoomGuests}</div>
               <div class="quote-item"><b>Stay Preference:</b><br>${stayLabel}</div>
-              <div class="quote-item"><b>Room Stay:</b><br>${roomPromoDetails.requestedDays} day(s)${roomLineItems.length > 0 && roomPromoDetails.promoApplied ? ` (Promo: ${roomPromoDetails.freeDays} day free, billed ${roomPromoDetails.billableDays} day(s))` : ""}</div>
+              <div class="quote-item"><b>Room Usage:</b><br>12 hours per day${roomLineItems.length > 0 && roomPromoDetails.requestedDays > 1 ? `<br>${roomPromoDetails.requestedDays} day(s) selected${roomPromoDetails.promoApplied ? ` (Promo: ${roomPromoDetails.freeDays} day free, billed ${roomPromoDetails.billableDays} day(s))` : ""}` : ""}</div>
               <div class="quote-item"><b>Check-in:</b><br>${formattedCheckInDate} ${schedule.checkInTime}</div>
               <div class="quote-item"><b>Check-out:</b><br>${formattedCheckOutDate} ${schedule.checkOutTime}</div>
             </div>
@@ -3941,7 +3992,7 @@
         `Contact Number: ${contactNumber || "N/A"}`,
         `Guests: ${guests}`,
         `Stay Preference: ${document.getElementById("preferStay").selectedOptions[0]?.text || "Day"}`,
-        `Room Stay: ${roomPromoDetails.requestedDays} day(s)${roomPromoDetails.promoApplied ? ` (${roomPromoDetails.freeDays} day free promo)` : ""}`,
+        `Room Usage: 12 hours per day${roomPromoDetails.requestedDays > 1 ? ` | ${roomPromoDetails.requestedDays} day(s)${roomPromoDetails.promoApplied ? ` (${roomPromoDetails.freeDays} day free promo)` : ""}` : ""}`,
       ];
       const rightDetails = [
         `Check-in: ${formattedCheckInDate} ${schedule.checkInTime}`,
@@ -4598,6 +4649,7 @@
       }
       initializeDatePicker();
       syncStayPreferenceFields();
+      toggleMultiDaySelectors();
       renderCateringChoices();
       updateHallFields();
       syncRoomSlotVisibility();
@@ -4623,6 +4675,7 @@
       syncStayPreferenceFields();
       syncStayDaysFromDateRange();
       applyPoolScheduleRules();
+      toggleMultiDaySelectors();
       updateCheckoutPreview();
       checkDateAvailability();
       updateLiveBookingSummary();
@@ -4638,12 +4691,14 @@
       }
       syncStayDaysFromDateRange();
       applyPoolScheduleRules();
+      toggleMultiDaySelectors();
       updateCheckoutPreview();
       checkDateAvailability();
       updateLiveBookingSummary();
     });
     document.getElementById("checkOutDatePicker").addEventListener("change", () => {
       syncStayDaysFromDateRange();
+      toggleMultiDaySelectors();
       updateCheckoutPreview();
       checkDateAvailability();
       updateLiveBookingSummary();
@@ -4660,6 +4715,12 @@
     });
     document.getElementById("stayDays").addEventListener("change", () => {
       applyPoolScheduleRules();
+      updateCheckoutPreview();
+      checkDateAvailability();
+      updateLiveBookingSummary();
+    });
+    document.getElementById("stayDaysVisible").addEventListener("change", () => {
+      document.getElementById("stayDays").value = document.getElementById("stayDaysVisible").value;
       updateCheckoutPreview();
       checkDateAvailability();
       updateLiveBookingSummary();
