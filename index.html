@@ -1052,7 +1052,7 @@
   <div id="welcomeOverlay" class="welcome-overlay">
     <div class="welcome-modal">
       <span class="welcome-badge">Welcome Guest</span>
-      <h2>Welcome to Dekack's Private Resort and Hotel</h2>
+      <h2 id="welcomeGreeting">Welcome to Dekack's Private Resort and Hotel</h2>
       <p>Before you continue to the quotation form, please enter your basic details first so we can guide your booking properly.</p>
       <button type="button" class="primary-btn" onclick="closeWelcomePopup()">Enter Booking Panel</button>
     </div>
@@ -1840,6 +1840,19 @@
       document.getElementById("welcomeOverlay").classList.add("hidden");
     }
 
+    function getTimeBasedGreeting() {
+      const hour = new Date().getHours();
+      if (hour < 12) return "Good morning";
+      if (hour < 18) return "Good afternoon";
+      return "Good evening";
+    }
+
+    function setWelcomeGreeting() {
+      const welcomeGreetingEl = document.getElementById("welcomeGreeting");
+      if (!welcomeGreetingEl) return;
+      welcomeGreetingEl.textContent = `${getTimeBasedGreeting()}, welcome to Dekack's Private Resort and Hotel`;
+    }
+
     function setRandomMotivationalVerse() {
       const verse = MOTIVATIONAL_VERSES[Math.floor(Math.random() * MOTIVATIONAL_VERSES.length)];
       const verseEl = document.getElementById("motivationVerse");
@@ -2176,18 +2189,73 @@
 
       const segments = [];
       if (mode === "day-tour") {
-        if (booking.checkInDate === targetDate) segments.push("am");
+        segments.push("am");
       } else if (mode === "overnight") {
         if (booking.checkInDate === targetDate) segments.push("pm");
         if (booking.checkOutDate === targetDate) segments.push("am");
+        if (booking.checkInDate < targetDate && booking.checkOutDate > targetDate) segments.push("am", "pm");
       } else if (mode === "day-night") {
         if (booking.checkInDate === targetDate) segments.push("am", "pm");
+        if (booking.checkInDate < targetDate && booking.checkOutDate > targetDate) segments.push("am", "pm");
         if (booking.checkOutDate === targetDate && booking.checkOutDate !== booking.checkInDate) segments.push("am");
       } else {
         segments.push("am", "pm");
       }
 
       return segments.map((segment) => ({ segment, status: collectionType === "pending" ? "pending" : "approved" }));
+    }
+
+    function bookingUsesPool(booking) {
+      return (Number(booking.poolBaseCost || 0) > 0) || !!booking.specialEventSelected;
+    }
+
+    function getRequestedPoolSegments(checkInDate, stayDays, poolMode, specialEventSelected, checkOutDate = "") {
+      const mode = getBookingMode(poolMode, specialEventSelected);
+      if (!checkInDate || mode === "standard") return [];
+
+      const occupiedDates = getOccupiedDates(checkInDate, stayDays, poolMode, specialEventSelected, checkOutDate);
+      const resolvedCheckOutDate = checkOutDate || (occupiedDates.length > 0 ? occupiedDates[occupiedDates.length - 1] : checkInDate);
+      const segments = [];
+
+      occupiedDates.forEach((date) => {
+        if (mode === "day-tour") {
+          segments.push({ date, segment: "am" });
+          return;
+        }
+
+        if (mode === "overnight") {
+          if (date === checkInDate) segments.push({ date, segment: "pm" });
+          if (date === resolvedCheckOutDate) segments.push({ date, segment: "am" });
+          if (date > checkInDate && date < resolvedCheckOutDate) {
+            segments.push({ date, segment: "am" }, { date, segment: "pm" });
+          }
+          return;
+        }
+
+        if (mode === "day-night" || mode === "special_event") {
+          if (date === resolvedCheckOutDate && date !== checkInDate) {
+            segments.push({ date, segment: "am" });
+            return;
+          }
+          segments.push({ date, segment: "am" }, { date, segment: "pm" });
+        }
+      });
+
+      return segments;
+    }
+
+    function calculatePoolAvailabilityFromSources(checkInDate, stayDays, sources, poolMode = "standard", specialEventSelected = false, checkOutDate = "") {
+      const requestedSegments = getRequestedPoolSegments(checkInDate, stayDays, poolMode, specialEventSelected, checkOutDate);
+      if (requestedSegments.length === 0) return POOL_LIMIT_PER_DAY;
+
+      const bookings = Array.isArray(sources) ? sources.filter(bookingUsesPool) : [];
+      const hasConflict = requestedSegments.some((requestedSegment) => {
+        return bookings.some((booking) => {
+          return getBookingSegmentsForDate(booking, requestedSegment.date, "approved").some(({ segment }) => segment === requestedSegment.segment);
+        });
+      });
+
+      return hasConflict ? 0 : POOL_LIMIT_PER_DAY;
     }
 
     function getSegmentColor(status) {
@@ -2205,6 +2273,19 @@
       if ((amColor === "red" && pmColor === "green") || (amColor === "green" && pmColor === "red")) return "mixed-rg";
       if ((amColor === "orange" && pmColor === "green") || (amColor === "green" && pmColor === "orange")) return "mixed-og";
       return "mixed-ro";
+    }
+
+    function getCalendarCellLabel(summary) {
+      if (!summary) return "Pool open";
+      if (summary.amStatus === "approved" && summary.pmStatus === "approved") return "Pool full";
+      if (summary.amStatus === "pending" && summary.pmStatus === "pending") return "Pool pending";
+      if (summary.amStatus === "approved" && summary.pmStatus !== "approved") return "Day booked";
+      if (summary.pmStatus === "approved" && summary.amStatus !== "approved") return "Night booked";
+      if (summary.amStatus === "pending" && summary.pmStatus === "available") return "Day pending";
+      if (summary.pmStatus === "pending" && summary.amStatus === "available") return "Night pending";
+      if (summary.amStatus === "approved" && summary.pmStatus === "pending") return "Day booked";
+      if (summary.pmStatus === "approved" && summary.amStatus === "pending") return "Night booked";
+      return "Pool open";
     }
 
     function getDateAvailabilitySummary(dateString) {
@@ -2227,22 +2308,22 @@
         });
       });
 
-      const rangeAvailability = getRangeAvailability(dateString, 1, "standard", false);
-      const combinedAvailability = calculateRangeAvailabilityFromSources(
-        dateString,
-        1,
-        [...getBookings(), ...getPendingBookings()],
-        "standard",
-        false
-      );
+      const poolRemaining = (amStatus === "available" || pmStatus === "available") ? POOL_LIMIT_PER_DAY : 0;
+      const poolRemainingWithPending = (amStatus !== "approved" || pmStatus !== "approved") ? POOL_LIMIT_PER_DAY : 0;
       return {
         amStatus,
         pmStatus,
         statusClass: buildCalendarStatusClass(amStatus, pmStatus),
-        roomAvailability: rangeAvailability.rooms,
-        roomAvailabilityWithPending: combinedAvailability.rooms,
-        poolRemaining: rangeAvailability.poolRemaining,
-        poolRemainingWithPending: combinedAvailability.poolRemaining,
+        roomAvailability: getRangeAvailability(dateString, 1, "standard", false).rooms,
+        roomAvailabilityWithPending: calculateRangeAvailabilityFromSources(
+          dateString,
+          1,
+          [...getBookings(), ...getPendingBookings()],
+          "standard",
+          false
+        ).rooms,
+        poolRemaining,
+        poolRemainingWithPending,
       };
     }
 
@@ -2349,7 +2430,7 @@
         const summary = getDateAvailabilitySummary(dateString);
         const selectedClass = selectedAvailabilityDate === dateString ? " selected" : "";
         const cellClass = isLocked ? "locked" : summary.statusClass;
-        const cellText = isLocked ? "Locked" : (summary.poolRemaining > 0 ? "Pool open" : "Pool full");
+        const cellText = isLocked ? "Locked" : getCalendarCellLabel(summary);
         const disabledAttr = isLocked ? "disabled" : "";
         const clickHandler = isLocked ? "" : `onclick="showAvailabilityDateDetails('${dateString}')"`;
         html += `
@@ -2425,12 +2506,10 @@
     function calculateRangeAvailabilityFromSources(checkInDate, stayDays, sources, poolMode = "standard", specialEventSelected = false, checkOutDate = "") {
       const days = getOccupiedDates(checkInDate, stayDays, poolMode, specialEventSelected, checkOutDate);
       const remainingRooms = { ...ROOM_LIMITS };
-      let poolRemaining = POOL_LIMIT_PER_DAY;
       const bookings = Array.isArray(sources) ? sources : [];
 
       days.forEach((day) => {
         const usedRooms = { couple: 0, attic: 0, deluxe: 0, barkada: 0, vip: 0, mattress: 0 };
-        let usedPool = 0;
 
         bookings.forEach((booking) => {
           const bookingDays = getBookingStayDates(booking);
@@ -2442,23 +2521,18 @@
               usedRooms[room.type] += room.type === "mattress" ? (parseInt(room.quantity, 10) || 0) : 1;
             }
           });
-
-          const hasPool = (booking.poolBaseCost || 0) > 0 || !!booking.specialEventSelected;
-          if (hasPool) usedPool += 1;
         });
 
         Object.keys(ROOM_LIMITS).forEach((type) => {
           const freeToday = ROOM_LIMITS[type] - usedRooms[type];
           remainingRooms[type] = Math.min(remainingRooms[type], freeToday);
         });
-
-        poolRemaining = Math.min(poolRemaining, POOL_LIMIT_PER_DAY - usedPool);
       });
 
       return {
         days,
         rooms: remainingRooms,
-        poolRemaining,
+        poolRemaining: calculatePoolAvailabilityFromSources(checkInDate, stayDays, bookings, poolMode, specialEventSelected, checkOutDate),
       };
     }
 
@@ -4428,6 +4502,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       applyRandomWeatherTheme();
+      setWelcomeGreeting();
       setRandomMotivationalVerse();
       initializeAvailabilityMonth();
       initializeFirebase();
