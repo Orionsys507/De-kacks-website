@@ -1283,25 +1283,12 @@
       <div id="availabilityInfo" style="margin:8px 0 12px;color:#1f3a5f;font-weight:600;"></div>
       <div class="helper-note">Room booking is optional. If you only want the pool, leave this section off.</div>
 
-      <label for="roomGuests">Guests Staying in Rooms:</label>
-      <input type="number" id="roomGuests" min="0" value="1" />
-      <div class="helper-note">Room rate is based on 12 hours per day.</div>
-      <div id="roomMultiDayWrap" class="hidden">
-        <label for="roomHours">Room Booking Days</label>
-        <select id="roomHours">
-          <option value="1">1 day</option>
-          <option value="2">2 days</option>
-          <option value="3">3 days</option>
-          <option value="4">4 days</option>
-          <option value="5">5 days</option>
-          <option value="6">6 days</option>
-          <option value="7">7 days</option>
-        </select>
-        <div class="helper-note">Promo: book rooms for more than 1 day and get 1 day free.</div>
-      </div>
+      <label for="roomHours">Room Usage Hours (minimum 12 hours)</label>
+      <input type="number" id="roomHours" min="12" step="1" value="12" />
+      <div class="helper-note">Room rate starts at 12 hours. Additional hours are computed automatically.</div>
       <div id="roomGuideInfo" class="room-guide-card">
         <strong>Room Guide</strong>
-        <p>Tell us how many guests will stay in rooms so we can suggest how many rooms you may need.</p>
+        <p>Select the room/s you want to reserve. Capacity limit checking is disabled by request.</p>
       </div>
 
       <div class="room-slot" data-room-slot="1">
@@ -2026,14 +2013,6 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    function estimateMinimumRooms(roomGuests) {
-      if (roomGuests <= 0) return 0;
-      if (roomGuests <= 2) return 1;
-      if (roomGuests <= 4) return 1;
-      if (roomGuests <= 8) return 2;
-      return Math.ceil(roomGuests / 10);
-    }
-
     function getBookingMode(poolMode, specialEventSelected) {
       if (specialEventSelected) return "special_event";
       if (poolMode === "day-tour") return "day-tour";
@@ -2115,28 +2094,20 @@
     function toggleMultiDaySelectors() {
       const checkInDate = document.getElementById("date").value;
       const checkOutDate = document.getElementById("checkOutDatePicker").value;
-      const roomWrap = document.getElementById("roomMultiDayWrap");
       const poolWrap = document.getElementById("poolMultiDayWrap");
       const stayDaysInput = document.getElementById("stayDays");
       const stayDaysVisible = document.getElementById("stayDaysVisible");
-      const roomHours = document.getElementById("roomHours");
       const multiDay = !!checkInDate && !!checkOutDate && getDateDifferenceInDays(checkInDate, checkOutDate) >= 1;
 
-      if (roomWrap) roomWrap.classList.toggle("hidden", !multiDay);
       if (poolWrap) poolWrap.classList.toggle("hidden", !multiDay);
 
       if (!multiDay) {
-        if (roomHours) roomHours.value = "1";
         if (stayDaysInput) stayDaysInput.value = "1";
         if (stayDaysVisible) stayDaysVisible.value = "1";
         return;
       }
 
       if (stayDaysVisible && stayDaysInput) stayDaysVisible.value = stayDaysInput.value || "1";
-      if (roomHours) {
-        const suggestedRoomDays = Math.max(1, getDateDifferenceInDays(checkInDate, checkOutDate));
-        roomHours.value = String(suggestedRoomDays);
-      }
     }
 
     function getOccupiedDates(checkInDate, stayDays, poolMode, specialEventSelected, checkOutDate = "") {
@@ -2251,17 +2222,14 @@
 
     function updateRoomGuide() {
       const totalGuests = Math.max(0, parseInt(document.getElementById("guests").value, 10) || 0);
-      const roomGuests = Math.max(0, parseInt(document.getElementById("roomGuests").value, 10) || 0);
       const selectedRooms = getSelectedRooms();
       const selectedCapacity = selectedRooms.reduce((sum, room) => sum + (room.pax || 0), 0);
       const guide = document.getElementById("roomGuideInfo");
       if (!guide) return;
 
-      const suggestedRooms = estimateMinimumRooms(roomGuests);
-      const remainingCapacity = Math.max(0, roomGuests - selectedCapacity);
       guide.innerHTML = `
         <strong>Room Guide</strong>
-        <p>Total guests: ${totalGuests}. Guests staying in rooms: ${roomGuests}. Suggested minimum rooms: ${suggestedRooms}. Selected room capacity: ${selectedCapacity} guest(s)${remainingCapacity > 0 ? `. You may still need room space for ${remainingCapacity} more guest(s).` : "."}</p>
+        <p>Total guests: ${totalGuests}. Selected room capacity: ${selectedCapacity} guest(s). You may choose any room combination you prefer.</p>
       `;
     }
 
@@ -2275,7 +2243,6 @@
       const dateLabel = document.getElementById("bookingDateRangeDisplay").value || (selectedDate ? formatDateLong(selectedDate) : "Choose a date from the calendar");
       const stayLabel = document.getElementById("preferStay").selectedOptions[0]?.text || "Day";
       const totalGuests = Math.max(0, parseInt(document.getElementById("guests").value, 10) || 0);
-      const roomGuests = Math.max(0, parseInt(document.getElementById("roomGuests").value, 10) || 0);
       const selectedRooms = getSelectedRooms();
       const roomNames = selectedRooms.length > 0
         ? selectedRooms.map((room) => room.text.split(" - ")[0]).join(", ")
@@ -2290,7 +2257,7 @@
         <div class="booking-summary-item"><strong>Guest</strong>${guestName}<br>${contact}</div>
         <div class="booking-summary-item"><strong>Date</strong>${dateLabel}</div>
         <div class="booking-summary-item"><strong>Stay</strong>${stayLabel}</div>
-        <div class="booking-summary-item"><strong>Guests</strong>${totalGuests} total | ${roomGuests} staying in rooms</div>
+        <div class="booking-summary-item"><strong>Guests</strong>${totalGuests} total</div>
         <div class="booking-summary-item"><strong>Rooms</strong>${roomNames}</div>
         <div class="booking-summary-item"><strong>Pool</strong>${poolLabel}</div>
       `;
@@ -2851,7 +2818,7 @@
       if (!checkInDate || stayDays < 1) return;
     }
 
-    async function savePendingBooking(reservationReference, name, contactNumber, checkInDate, selectedCheckOutDate, stayDays, guests, roomGuests, checkInTime, checkOutTime, rooms, roomHours, poolDetails, cateringDetails, hallDetails, specialEventDetails) {
+    async function savePendingBooking(reservationReference, name, contactNumber, checkInDate, selectedCheckOutDate, stayDays, guests, checkInTime, checkOutTime, rooms, roomHours, poolDetails, cateringDetails, hallDetails, specialEventDetails) {
       const error = validateSelectionAgainstAvailability(checkInDate, stayDays, rooms, poolDetails, specialEventDetails, selectedCheckOutDate);
       if (error) return false;
 
@@ -2862,7 +2829,6 @@
         Number(poolDetails.computedCost || 0) +
         Number(cateringDetails.totalCost || 0) +
         Number(hallDetails.cost || 0);
-      const roomPromoDetails = getRoomPromoDetails(roomHours);
       const bookingId = `pending_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       const booking = {
         id: bookingId,
@@ -2870,7 +2836,6 @@
         name,
         contactNumber,
         guests,
-        roomGuests,
         checkInDate,
         checkOutDate: schedule.checkOutDate,
         stayDays,
@@ -2880,9 +2845,6 @@
         occupiedDates: schedule.occupiedDates,
         rooms,
         roomHours,
-        roomStayDays: roomPromoDetails.requestedDays,
-        roomBillableDays: roomPromoDetails.billableDays,
-        roomPromoFreeDays: roomPromoDetails.freeDays,
         specialEventSelected: specialEventDetails.selected,
         specialEventLabel: specialEventDetails.label,
         specialEventHours: specialEventDetails.hours,
@@ -3073,27 +3035,15 @@
     }
 
     function getRoomUsageHours() {
-      const raw = parseInt(document.getElementById("roomHours").value, 10) || 1;
-      return Math.max(1, raw);
+      const raw = parseInt(document.getElementById("roomHours").value, 10) || 12;
+      return Math.max(12, raw);
     }
 
     function computeRoomCost(basePrice, roomHours) {
-      const roomDays = Math.max(1, roomHours || 1);
-      const freeDays = roomDays > 1 ? 1 : 0;
-      const billableDays = Math.max(1, roomDays - freeDays);
-      return basePrice * billableDays;
-    }
-
-    function getRoomPromoDetails(roomDays) {
-      const requestedDays = Math.max(1, roomDays || 1);
-      const freeDays = requestedDays > 1 ? 1 : 0;
-      const billableDays = Math.max(1, requestedDays - freeDays);
-      return {
-        requestedDays,
-        freeDays,
-        billableDays,
-        promoApplied: freeDays > 0,
-      };
+      const hours = Math.max(12, roomHours || 12);
+      const extraHours = Math.max(0, hours - 12);
+      const perHourRate = basePrice / 12;
+      return basePrice + (extraHours * perHourRate);
     }
 
     function getPoolDetails(stayDays, specialEventDetails = null) {
@@ -3249,11 +3199,7 @@
       if (!showRooms) {
         resetRoomSlotVisibility();
         document.getElementById("mattressQuantity").value = "0";
-        document.getElementById("roomGuests").value = "0";
       } else {
-        if ((parseInt(document.getElementById("roomGuests").value, 10) || 0) === 0) {
-          document.getElementById("roomGuests").value = document.getElementById("guests").value || "1";
-        }
         syncRoomSlotVisibility();
       }
 
@@ -3484,7 +3430,6 @@
         : subtotal * 0.2;
       const fullyPaid = !!booking.fullyPaid;
       const remainingBalance = fullyPaid ? 0 : Math.max(0, total - downpayment);
-      const roomPromoDetails = getRoomPromoDetails(Number(booking.roomStayDays || booking.roomHours || 1));
       return {
         specialEventTotal,
         roomTotal,
@@ -3499,7 +3444,6 @@
         downpayment,
         remainingBalance,
         fullyPaid,
-        roomPromoDetails,
       };
     }
 
@@ -3602,8 +3546,7 @@
       document.getElementById("checkOutDate").value = "";
       document.getElementById("checkOutTime").value = "17:00";
       document.getElementById("guests").value = "1";
-      document.getElementById("roomGuests").value = "1";
-      document.getElementById("roomHours").value = "1";
+      document.getElementById("roomHours").value = "12";
       document.getElementById("stayDaysVisible").value = "1";
       document.getElementById("pool-select").value = "0";
       document.getElementById("specialEventSelect").value = "0";
@@ -3654,9 +3597,6 @@
       const selectedCheckOutDate = document.getElementById("checkOutDatePicker").value;
       const stayDays = parseInt(document.getElementById("stayDays").value, 10) || 0;
       const guests = parseInt(document.getElementById("guests").value, 10) || 0;
-      const roomGuests = Math.max(0, parseInt(document.getElementById("roomGuests").value, 10) || 0);
-      const wantsRoomAccommodation = document.getElementById("showRoomsCheckbox").checked;
-      const effectiveRoomGuests = wantsRoomAccommodation ? roomGuests : 0;
       const roomHours = getRoomUsageHours();
       const specialEventDetails = getSpecialEventDetails();
       const stayLabel = document.getElementById("preferStay").selectedOptions[0]?.text || "Day";
@@ -3701,22 +3641,11 @@
         return;
       }
 
-      if (effectiveRoomGuests > guests) {
-        alert("Guests staying in rooms cannot be higher than total guests.");
-        return;
-      }
-
       const rooms = specialEventDetails.selected ? getSpecialEventRooms() : getSelectedRooms();
       if (!specialEventDetails.selected) {
         const roomError = validateRoomAvailability(rooms);
         if (roomError) {
           alert(roomError);
-          return;
-        }
-
-        const totalCapacity = rooms.reduce((sum, room) => sum + room.pax, 0);
-        if (effectiveRoomGuests > 0 && totalCapacity < effectiveRoomGuests) {
-          alert("Selected rooms cannot accommodate the guests staying in rooms.");
           return;
         }
       }
@@ -3760,7 +3689,6 @@
         alert(selectionError);
         return;
       }
-      const roomPromoDetails = getRoomPromoDetails(roomHours);
       const roomLineItems = rooms.map((room) => ({
         ...room,
         computedPrice: specialEventDetails.selected ? 0 : (room.type === "mattress" ? room.price : computeRoomCost(room.price, roomHours)),
@@ -3809,9 +3737,9 @@
               <div class="quote-item"><b>Reference No.:</b><br>${reservationReference}</div>
               <div class="quote-item"><b>Contact Number:</b><br>${contactNumber}</div>
               <div class="quote-item"><b>Total Guests:</b><br>${guests}</div>
-              <div class="quote-item"><b>Room Guests:</b><br>${effectiveRoomGuests}</div>
+              <div class="quote-item"><b>Rooms Selected:</b><br>${roomLineItems.length}</div>
               <div class="quote-item"><b>Stay Preference:</b><br>${stayLabel}</div>
-              <div class="quote-item"><b>Room Usage:</b><br>12-hour room rate per day${roomLineItems.length > 0 && roomPromoDetails.requestedDays > 1 ? `<br>${roomPromoDetails.requestedDays} day(s) selected${roomPromoDetails.promoApplied ? ` (Promo: ${roomPromoDetails.freeDays} day free, billed ${roomPromoDetails.billableDays} day(s))` : ""}` : ""}</div>
+              <div class="quote-item"><b>Room Usage:</b><br>${roomHours} hour(s) total (minimum 12 hours)</div>
               <div class="quote-item"><b>Check-in:</b><br>${formattedCheckInDate} ${schedule.checkInTime}</div>
               <div class="quote-item"><b>Check-out:</b><br>${formattedCheckOutDate} ${schedule.checkOutTime}</div>
             </div>
@@ -3830,11 +3758,6 @@
                 <div>${specialEventDetails.selected ? "Included" : `PHP ${room.computedPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}</div>
               </div>
             `).join("") : '<div class="quote-row"><div>No rooms selected.</div><div>PHP 0.00</div></div>'}
-            ${roomLineItems.length > 0 && roomPromoDetails.promoApplied ? `
-            <div class="quote-row">
-              <div><strong>Room Promo</strong><br>Requested ${roomPromoDetails.requestedDays} day(s), billed ${roomPromoDetails.billableDays} day(s), with ${roomPromoDetails.freeDays} free day.</div>
-              <div>Included</div>
-            </div>` : ""}
 
             <div class="quote-row">
               <div><strong>Total Room Cost</strong></div>
@@ -3898,14 +3821,10 @@
         stayDays,
         stayLabel,
         guests,
-        roomGuests: effectiveRoomGuests,
         checkInTime: schedule.checkInTime,
         checkOutTime: schedule.checkOutTime,
         rooms: roomLineItems,
         roomHours,
-        roomStayDays: roomPromoDetails.requestedDays,
-        roomBillableDays: roomPromoDetails.billableDays,
-        roomPromoFreeDays: roomPromoDetails.freeDays,
         poolDetails,
         cateringDetails,
         hallDetails,
@@ -3931,7 +3850,6 @@
         selectedCheckOutDate,
         stayDays,
         guests,
-        roomGuests,
         checkInTime,
         checkOutTime,
         rooms,
@@ -3956,7 +3874,6 @@
         selectedCheckOutDate,
         stayDays,
         guests,
-        roomGuests,
         checkInTime,
         checkOutTime,
         rooms,
@@ -4023,7 +3940,6 @@
 
       const cateringDetails = getCateringDetails();
       const hallDetails = getFunctionHallDetails(cateringDetails, specialEventDetails);
-      const roomPromoDetails = getRoomPromoDetails(roomHours);
       const roomLineItems = rooms.map((room) => ({
         ...room,
         computedPrice: specialEventDetails.selected ? 0 : (room.type === "mattress" ? room.price : computeRoomCost(room.price, roomHours)),
@@ -4091,7 +4007,7 @@
         `Contact Number: ${contactNumber || "N/A"}`,
         `Guests: ${guests}`,
         `Stay Preference: ${document.getElementById("preferStay").selectedOptions[0]?.text || "Day"}`,
-        `Room Usage: 12-hour room rate per day${roomPromoDetails.requestedDays > 1 ? ` | ${roomPromoDetails.requestedDays} day(s)${roomPromoDetails.promoApplied ? ` (${roomPromoDetails.freeDays} free day promo)` : ""}` : ""}`,
+        `Room Usage: ${roomHours} hour(s) total (minimum 12 hours)`,
       ];
       const rightDetails = [
         `Check-in: ${formattedCheckInDate} ${schedule.checkInTime}`,
@@ -4160,10 +4076,6 @@
           drawRow(`${room.displayLabel || `Room ${room.slot}`}: ${roomName}`, specialEventDetails.selected ? "Included" : money(room.computedPrice), y);
           y += rowHeight;
         });
-        if (!specialEventDetails.selected && roomPromoDetails.promoApplied) {
-          drawRow(`Room Promo: ${roomPromoDetails.freeDays} free day`, `Requested ${roomPromoDetails.requestedDays} day(s), billed ${roomPromoDetails.billableDays} day(s)`, y);
-          y += rowHeight;
-        }
       }
       drawRow("Total Room Cost", money(totalRoomCost), y, true);
       y += 9;
@@ -4523,8 +4435,7 @@
               <p>Check-in: ${formattedCheckIn} ${booking.checkInTime || "08:00"}</p>
               <p>Check-out: ${formattedCheckOut} ${booking.checkOutTime || "17:00"}</p>
               <p>Guests: ${booking.guests}</p>
-              <p>Room Guests: ${booking.roomGuests || booking.guests || 0}</p>
-              <p>Room Booking Days: ${booking.roomStayDays || booking.roomHours || 1} day(s)${Number(booking.roomPromoFreeDays || 0) > 0 ? ` (${booking.roomPromoFreeDays} free day promo)` : ""}</p>
+              <p>Room Usage: ${Math.max(12, Number(booking.roomHours) || 12)} hour(s)</p>
               <p>Special Event: ${booking.specialEventSelected ? `${booking.specialEventLabel} - PHP ${Number(booking.specialEventCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${booking.specialEventCateringMode === "with" ? "With cater" : "Non-cater"})` : "None"}</p>
               <p>Rooms: ${
                 Array.isArray(booking.rooms) && booking.rooms.length > 0
@@ -4581,8 +4492,7 @@
               <p>Check-in: ${formattedCheckIn} ${booking.checkInTime || "08:00"}</p>
               <p>Check-out: ${formattedCheckOut} ${booking.checkOutTime || "17:00"}</p>
               <p>Guests: ${booking.guests}</p>
-              <p>Room Guests: ${booking.roomGuests || booking.guests || 0}</p>
-              <p>Room Booking Days: ${booking.roomStayDays || booking.roomHours || 1} day(s)${Number(booking.roomPromoFreeDays || 0) > 0 ? ` (${booking.roomPromoFreeDays} free day promo)` : ""}</p>
+              <p>Room Usage: ${Math.max(12, Number(booking.roomHours) || 12)} hour(s)</p>
               <p>Special Event: ${booking.specialEventSelected ? `${booking.specialEventLabel} - PHP ${Number(booking.specialEventCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${booking.specialEventCateringMode === "with" ? "With cater" : "Non-cater"})` : "None"}</p>
               <p>Rooms: ${
                 Array.isArray(booking.rooms) && booking.rooms.length > 0
@@ -4847,12 +4757,7 @@
     document.getElementById("specialEventSelect").addEventListener("change", updateSpecialEventFields);
     document.getElementById("specialEventCateringMode").addEventListener("change", updateSpecialEventFields);
     document.getElementById("guests").addEventListener("input", () => {
-      document.getElementById("roomGuests").value = document.getElementById("guests").value || "0";
       updateHallFields();
-      updateRoomGuide();
-      updateLiveBookingSummary();
-    });
-    document.getElementById("roomGuests").addEventListener("input", () => {
       updateRoomGuide();
       updateLiveBookingSummary();
     });
