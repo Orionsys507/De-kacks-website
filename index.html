@@ -1187,6 +1187,17 @@
     animation: toastIn 180ms ease forwards;
   }
 
+  .admin-panel-shell {
+    display: none;
+    padding: 16px;
+    background: #f6faf8;
+    border: 1px solid #d4e4de;
+    border-radius: 18px;
+    box-shadow: 0 18px 34px rgba(15, 62, 102, 0.12);
+    margin-top: 16px;
+    min-height: 180px;
+  }
+
   .offline-ribbon {
     position: fixed;
     top: 0;
@@ -1827,6 +1838,10 @@
     </div>
   </div>
 
+  <div id="adminPanelShell" class="admin-panel-shell">
+    <div id="adminPanelContent"></div>
+  </div>
+
     <button id="adminBtn" onclick="adminLogin()">Open Admin Panel</button>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -2397,10 +2412,16 @@
       const preEntryPanel = document.getElementById("preEntryPanel");
       const availabilityStepPanel = document.getElementById("availabilityStepPanel");
       const bookingFormPanel = document.getElementById("bookingFormPanel");
+      const adminShell = document.getElementById("adminPanelShell");
+      const quotationEl = document.getElementById("quotation");
+      adminPanelOpen = true;
+      managementPanelOpen = false;
       if (welcomeOverlay) welcomeOverlay.classList.add("hidden");
       if (preEntryPanel) preEntryPanel.classList.add("hidden");
       if (availabilityStepPanel) availabilityStepPanel.classList.add("hidden");
-      if (bookingFormPanel) bookingFormPanel.classList.remove("hidden");
+      if (bookingFormPanel) bookingFormPanel.classList.add("hidden");
+      if (quotationEl) quotationEl.innerHTML = "";
+      if (adminShell) adminShell.style.display = "block";
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -2410,6 +2431,7 @@
       const availabilityStepPanel = document.getElementById("availabilityStepPanel");
       const bookingFormPanel = document.getElementById("bookingFormPanel");
       const quotationEl = document.getElementById("quotation");
+      const adminShell = document.getElementById("adminPanelShell");
       adminPanelOpen = false;
       managementPanelOpen = false;
       if (welcomeOverlay) welcomeOverlay.classList.add("hidden");
@@ -2417,6 +2439,7 @@
       if (availabilityStepPanel) availabilityStepPanel.classList.remove("hidden");
       if (bookingFormPanel) bookingFormPanel.classList.add("hidden");
       if (quotationEl) quotationEl.innerHTML = "";
+      if (adminShell) adminShell.style.display = "none";
       initializeAvailabilityMonth();
       renderAvailabilityCalendar();
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -5259,7 +5282,10 @@
     function viewBookings() {
       showAdminWorkspace();
       if (!isAdminAuthenticated()) {
-        document.getElementById("quotation").innerHTML = "<h3>Admin login required.</h3><p>Click the Admin Panel button below, then sign in with your Firebase Authentication email and password.</p>";
+        const shell = document.getElementById("adminPanelShell");
+        const content = document.getElementById("adminPanelContent");
+        if (shell) shell.style.display = "block";
+        if (content) content.innerHTML = "<h3>Admin login required.</h3><p>Use Ctrl + A or the Admin button, then sign in with your Firebase admin account.</p>";
         return;
       }
 
@@ -5272,13 +5298,25 @@
         return;
       }
 
-      let output = `<h3>Admin Booking Panel</h3>`;
+      let output = `<h3>Management Calendar & Bookings</h3>`;
       output += `<p><strong>Signed in as:</strong> ${auth.currentUser.email || "Admin"}</p>`;
       output += `<button onclick="adminLogout()" style="background:#455a64;color:#fff;width:auto;padding:8px 12px;">Log Out</button>`;
       output += `<p><strong>Pending Approval:</strong> ${pending.length} | <strong>Approved:</strong> ${approved.length}</p>`;
-      output += getAdminBookingListHtml(combinedBookings);
+      output += `
+        <div class="admin-calendar-panel">
+          <div class="admin-calendar-header">
+            <h4>Booking Calendar</h4>
+            <input type="month" value="${adminCalendarMonth}" onchange="changeAdminCalendarMonth(this.value)" />
+          </div>
+          ${getAdminCalendarHtml(combinedBookings)}
+          ${getAdminBookingListHtml(combinedBookings, adminSelectedDate)}
+        </div>
+      `;
 
-      document.getElementById("quotation").innerHTML = output;
+      const shell = document.getElementById("adminPanelShell");
+      const content = document.getElementById("adminPanelContent");
+      if (shell) shell.style.display = "block";
+      if (content) content.innerHTML = output;
     }
 
     function changeAdminCalendarMonth(nextMonth) {
@@ -5602,6 +5640,10 @@
       afterBookingCacheUpdate();
       const adminBtn = document.getElementById("adminBtn");
       if (adminBtn) adminBtn.style.display = "none";
+      const adminShell = document.getElementById("adminPanelShell");
+      const adminContent = document.getElementById("adminPanelContent");
+      if (adminShell) adminShell.style.display = "none";
+      if (adminContent) adminContent.innerHTML = "";
     }
 
     // Keyboard shortcuts: Ctrl + A for admin panel, Alt + 1 for booking calendar
