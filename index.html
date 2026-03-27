@@ -1492,7 +1492,7 @@
       <span class="welcome-badge">Welcome Guest</span>
       <h2 id="welcomeGreeting">Welcome to Dekack's Private Resort and Hotel</h2>
       <p>Before you continue to the quotation form, please enter your basic details first so we can guide your booking properly.</p>
-      <button type="button" class="primary-btn" onclick="closeWelcomePopup()">Enter Booking Panel</button>
+      <button id="enterBookingBtn" type="button" class="primary-btn" onclick="closeWelcomePopup()">Enter Booking Panel</button>
     </div>
   </div>
   <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
@@ -5789,6 +5789,15 @@
     });
     document.getElementById("showRoomsCheckbox").addEventListener("change", () => setQuickSetupActive(""));
     document.getElementById("showPoolCheckbox").addEventListener("change", () => setQuickSetupActive(""));
+    const enterBtn = document.getElementById("enterBookingBtn");
+    if (enterBtn) enterBtn.addEventListener("click", closeWelcomePopup);
+    // Failsafe: auto-hide overlay if still visible after 500ms
+    setTimeout(() => {
+      const overlay = document.getElementById("welcomeOverlay");
+      if (overlay && !overlay.classList.contains("hidden")) {
+        closeWelcomePopup();
+      }
+    }, 500);
   </script>
 </body>
 </html>
