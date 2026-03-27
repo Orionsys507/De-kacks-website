@@ -867,6 +867,23 @@
     padding: 16px;
   }
 
+  .availability-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+
+  .availability-main {
+    min-width: 0;
+  }
+
+  .availability-side {
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+
   .calendar-toolbar {
     display: flex;
     align-items: center;
@@ -1036,6 +1053,53 @@
     justify-content: space-between;
     gap: 10px;
     flex-wrap: wrap;
+  }
+
+  .availability-booking-details {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    border: 1px solid #d8e7df;
+    background: #f7fcfa;
+  }
+
+  .availability-booking-details h4,
+  .availability-booking-details p {
+    margin: 0;
+  }
+
+  .availability-booking-details h4 {
+    color: var(--primary);
+    margin-bottom: 8px;
+  }
+
+  .availability-booking-details p {
+    color: #4d6661;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .availability-booking-list {
+    margin-top: 10px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .availability-booking-item {
+    border: 1px solid #d6e4df;
+    border-radius: 12px;
+    background: #fff;
+    padding: 10px 12px;
+  }
+
+  .availability-booking-item p {
+    margin: 0 0 6px;
+  }
+
+  @media (max-width: 940px) {
+    .availability-layout {
+      grid-template-columns: 1fr;
+    }
   }
 
   @media (max-width: 640px) {
@@ -1357,15 +1421,25 @@
           <span class="legend-pill legend-mixed-rg">Half Red/Green: Pool Halfday Available</span>
           <span class="legend-pill legend-mixed-og">Half Orange/Green: Pool Halfday Pending/Available</span>
         </div>
-        <div id="availabilityCalendar" class="calendar-grid"></div>
-        <div id="availabilityDateDetails" class="availability-date-details">
-          <h4>No Date Selected</h4>
-          <p>Select a date in the calendar to view available time and accommodation details.</p>
-        </div>
-        <div class="availability-booked-dates">
-          <h4>Dates With Booking</h4>
-          <p id="availabilityBookedDatesEmpty">Loading booked dates...</p>
-          <ul id="availabilityBookedDatesList" class="availability-booked-dates-list"></ul>
+        <div class="availability-layout">
+          <div class="availability-main">
+            <div id="availabilityCalendar" class="calendar-grid"></div>
+          </div>
+          <div class="availability-side">
+            <div id="availabilityDateDetails" class="availability-date-details">
+              <h4>No Date Selected</h4>
+              <p>Select a date in the calendar to view available time and accommodation details.</p>
+            </div>
+            <div class="availability-booked-dates">
+              <h4>Dates With Booking</h4>
+              <p id="availabilityBookedDatesEmpty">Loading booked dates...</p>
+              <ul id="availabilityBookedDatesList" class="availability-booked-dates-list"></ul>
+            </div>
+            <div id="availabilityBookingDetails" class="availability-booking-details">
+              <h4>All Bookings Summary</h4>
+              <p>Loading booking summary...</p>
+            </div>
+          </div>
         </div>
         <button type="button" class="primary-btn" onclick="continueToQuotationForm()">Continue to Booking Form</button>
       </div>
@@ -1624,7 +1698,8 @@
   <script>
     const STORAGE_KEY = "bookings";
     const PENDING_STORAGE_KEY = "pendingBookings";
-    const ADMIN_UNLOCK_SECRET = "atl+1";
+    const ADMIN_PANEL_SHORTCUT = "ctrl+1";
+    const BOOKING_CALENDAR_SHORTCUT = "alt+1";
     const BOOKINGS_COLLECTION = "bookings";
     const PENDING_BOOKINGS_COLLECTION = "pendingBookings";
     const FIREBASE_CONFIG = {
@@ -1906,6 +1981,7 @@
       checkDateAvailability();
       renderAvailabilityCalendar();
       renderAvailabilityBookedDatesList();
+      renderAvailabilityBookingDetails(selectedAvailabilityDate || "");
       if (selectedAvailabilityDate) showAvailabilityDateDetails(selectedAvailabilityDate);
       if (adminPanelOpen) viewBookings();
     }
@@ -2108,6 +2184,25 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
+    function showBookingCalendarWorkspace() {
+      const welcomeOverlay = document.getElementById("welcomeOverlay");
+      const preEntryPanel = document.getElementById("preEntryPanel");
+      const availabilityStepPanel = document.getElementById("availabilityStepPanel");
+      const bookingFormPanel = document.getElementById("bookingFormPanel");
+      const quotationEl = document.getElementById("quotation");
+      adminPanelOpen = false;
+      if (welcomeOverlay) welcomeOverlay.classList.add("hidden");
+      if (preEntryPanel) preEntryPanel.classList.add("hidden");
+      if (availabilityStepPanel) availabilityStepPanel.classList.remove("hidden");
+      if (bookingFormPanel) bookingFormPanel.classList.add("hidden");
+      if (quotationEl) quotationEl.innerHTML = "";
+      initializeAvailabilityMonth();
+      renderAvailabilityCalendar();
+      renderAvailabilityBookedDatesList();
+      renderAvailabilityBookingDetails(selectedAvailabilityDate || "");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
     function getTimeBasedGreeting() {
       const hour = new Date().getHours();
       if (hour < 12) return "Good morning";
@@ -2163,6 +2258,7 @@
       document.getElementById("availabilityStepPanel").classList.remove("hidden");
       initializeAvailabilityMonth();
       renderAvailabilityCalendar();
+      renderAvailabilityBookingDetails(selectedAvailabilityDate || "");
       updateRoomGuide();
       updateLiveBookingSummary();
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2725,6 +2821,7 @@
         <p>${bookingNote}</p>
       `;
 
+      renderAvailabilityBookingDetails(dateString);
       syncStayDaysFromDateRange();
       updateCheckoutPreview();
       checkDateAvailability();
@@ -2780,6 +2877,89 @@
         if (entry.pending > 0 && entry.approved === 0) statusText = `Pending: ${entry.pending}`;
         return `<li><span>${formatDateLong(entry.dateString)}</span><strong>${statusText}</strong></li>`;
       }).join("");
+    }
+
+    function getCombinedBookingsForDate(dateString) {
+      const pending = getPendingBookings().map((booking) => ({ collectionType: "pending", booking }));
+      const approved = getBookings().map((booking) => ({ collectionType: "approved", booking }));
+      return [...pending, ...approved].filter(({ booking }) => getBookingStayDates(booking).includes(dateString));
+    }
+
+    function renderAvailabilityBookingDetails(dateString = "") {
+      const container = document.getElementById("availabilityBookingDetails");
+      if (!container) return;
+
+      if (!dateString) {
+        const allEntries = getAdminCombinedBookings();
+        if (allEntries.length === 0) {
+          container.innerHTML = `
+            <h4>All Bookings Summary</h4>
+            <p>No bookings available yet.</p>
+          `;
+          return;
+        }
+
+        let allHtml = `<h4>All Bookings Summary</h4><div class="availability-booking-list">`;
+        allEntries.forEach(({ collectionType, booking }) => {
+          const statusLabel = collectionType === "pending" ? "Pending Approval" : "Booked";
+          const statusColor = collectionType === "pending" ? "#b26a00" : "#1f7a3f";
+          const checkInDate = getNormalizedCheckInDate(booking);
+          const checkOutDate = getNormalizedCheckOutDate(booking);
+          const formattedCheckIn = checkInDate ? new Date(`${checkInDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) : "N/A";
+          const formattedCheckOut = checkOutDate ? new Date(`${checkOutDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) : "N/A";
+
+          allHtml += `
+            <div class="availability-booking-item">
+              <p><strong>${booking.name || "Guest"}</strong> <span style="color:${statusColor};font-weight:700;">(${statusLabel})</span></p>
+              <p><strong>Date:</strong> ${formattedCheckIn} to ${formattedCheckOut}</p>
+              <p><strong>Rebooking Key:</strong> ${booking.reservationReference || "N/A"}</p>
+              <p><strong>Pool:</strong> ${stripPriceText(booking.poolBreakdown || "None")}</p>
+            </div>
+          `;
+        });
+        allHtml += `</div>`;
+        container.innerHTML = allHtml;
+        return;
+      }
+
+      const entries = getCombinedBookingsForDate(dateString);
+      if (entries.length === 0) {
+        container.innerHTML = `
+          <h4>${formatDateLong(dateString)}</h4>
+          <p>No booking details found for this date.</p>
+        `;
+        return;
+      }
+
+      let html = `<h4>${formatDateLong(dateString)} - Booking Details</h4><div class="availability-booking-list">`;
+      entries.forEach(({ collectionType, booking }) => {
+        const statusLabel = collectionType === "pending" ? "Pending Approval" : "Booked";
+        const statusColor = collectionType === "pending" ? "#b26a00" : "#1f7a3f";
+        const checkInDate = getNormalizedCheckInDate(booking);
+        const checkOutDate = getNormalizedCheckOutDate(booking);
+        const formattedCheckIn = new Date(`${checkInDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+        const formattedCheckOut = new Date(`${checkOutDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+
+        html += `
+          <div class="availability-booking-item">
+            <p><strong>${booking.name || "Guest"}</strong> <span style="color:${statusColor};font-weight:700;">(${statusLabel})</span></p>
+            <p><strong>Rebooking Key:</strong> ${booking.reservationReference || "N/A"}</p>
+            <p><strong>Contact Number:</strong> ${booking.contactNumber || "N/A"}</p>
+            <p><strong>Package:</strong> ${getBookingPackageSummaryNoPrice(booking)}</p>
+            <p><strong>Stay:</strong> ${getBookingStayLabel(booking)}</p>
+            <p><strong>Check-in:</strong> ${formattedCheckIn} ${booking.checkInTime || "08:00"}</p>
+            <p><strong>Check-out:</strong> ${formattedCheckOut} ${booking.checkOutTime || "17:00"}</p>
+            <p><strong>Guests:</strong> ${booking.guests || 0}</p>
+            <p><strong>Rooms:</strong> ${getBookingRoomNamesNoPrice(booking)}</p>
+            <p><strong>Pool:</strong> ${stripPriceText(booking.poolBreakdown || "None")}</p>
+            <p><strong>Catering:</strong> ${stripPriceText(booking.cateringPackage || "None")} ${booking.cateringPersons ? `(${booking.cateringPersons} pax)` : ""}</p>
+            <p><strong>Function Hall:</strong> ${booking.hallSelected ? stripPriceText(booking.hallLabel || "Included") : "None"}</p>
+            <button onclick="rebookBookingByKey('${collectionType}', '${String(booking.id)}')" style="background:#0f3e66;color:#fff;width:auto;padding:8px 12px;">Rebook (Key)</button>
+          </div>
+        `;
+      });
+      html += `</div>`;
+      container.innerHTML = html;
     }
 
     function renderAvailabilityCalendar() {
@@ -4802,7 +4982,6 @@
             <p><strong>Pool:</strong> ${stripPriceText(booking.poolBreakdown || "None")}</p>
             <p><strong>Catering:</strong> ${stripPriceText(booking.cateringPackage || "None")} ${booking.cateringPersons ? `(${booking.cateringPersons} pax)` : ""}</p>
             <p><strong>Function Hall:</strong> ${booking.hallSelected ? stripPriceText(booking.hallLabel || "Included") : "None"}</p>
-            <button onclick="rebookBookingById('${collectionType}', '${String(booking.id)}')" style="background:#0f3e66;color:#fff;width:auto;padding:8px 12px;">Rebooking</button>
             <button class="delete-btn" onclick="deleteBookingById('${collectionType}', '${String(booking.id)}')">Delete</button>
             ${pendingActions}
             ${fullyPaidBtn}
@@ -4938,6 +5117,99 @@
       if (adminPanelOpen) viewBookings();
     }
 
+    async function rebookBookingByKey(collectionType, bookingId) {
+      const source = collectionType === "pending" ? getPendingBookings() : getBookings();
+      const booking = source.find((item) => String(item.id) === String(bookingId));
+      if (!booking) return;
+
+      const expectedKey = String(booking.reservationReference || "").trim();
+      if (!expectedKey) {
+        alert("No rebooking key is available for this booking.");
+        return;
+      }
+
+      const enteredKey = prompt("Enter rebooking key:");
+      if (!enteredKey) return;
+      if (enteredKey.trim() !== expectedKey) {
+        alert("Invalid rebooking key.");
+        return;
+      }
+
+      const currentCheckIn = getNormalizedCheckInDate(booking);
+      const inputDate = prompt("Enter new check-in date (YYYY-MM-DD):", currentCheckIn);
+      if (!inputDate) return;
+      const nextCheckInDate = inputDate.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(nextCheckInDate)) {
+        alert("Invalid date format. Please use YYYY-MM-DD.");
+        return;
+      }
+      const todayIso = toISODate(new Date());
+      if (nextCheckInDate < todayIso) {
+        alert("Rebooking date cannot be in the past.");
+        return;
+      }
+
+      const stayDays = getNormalizedStayDays(booking);
+      const poolMode = inferBookingPoolMode(booking);
+      const selectedCheckOutDate = addDays(nextCheckInDate, stayDays);
+      const schedule = getScheduleFromRules(
+        nextCheckInDate,
+        stayDays,
+        booking.checkInTime || "08:00",
+        poolMode,
+        !!booking.specialEventSelected,
+        selectedCheckOutDate
+      );
+
+      const otherApproved = getBookings().filter((item) => String(item.id) !== String(bookingId));
+      const otherPending = getPendingBookings().filter((item) => String(item.id) !== String(bookingId));
+      const comparisonSource = collectionType === "approved" ? otherApproved : [...otherApproved, ...otherPending];
+
+      const validationError = validateSelectionAgainstSources(
+        nextCheckInDate,
+        stayDays,
+        Array.isArray(booking.rooms) ? booking.rooms : [],
+        {
+          baseCost: booking.poolBaseCost || 0,
+          computedCost: booking.poolComputedCost || 0,
+          breakdown: booking.poolBreakdown || "None",
+          schedule: booking.poolSchedule || "N/A",
+          mode: poolMode,
+        },
+        {
+          selected: !!booking.specialEventSelected,
+          baseCost: booking.specialEventCost || 0,
+        },
+        schedule.checkOutDate,
+        comparisonSource
+      );
+
+      if (validationError) {
+        alert(`Cannot rebook: ${validationError}`);
+        return;
+      }
+
+      const updatedBooking = {
+        ...booking,
+        checkInDate: nextCheckInDate,
+        checkOutDate: schedule.checkOutDate,
+        checkInTime: schedule.checkInTime,
+        checkOutTime: schedule.checkOutTime,
+        occupiedDates: schedule.occupiedDates,
+        rebookedAt: new Date().toISOString(),
+      };
+
+      await saveBookingRecord(getCollectionName(collectionType), updatedBooking);
+      alert(`Rebooking complete. New check-in date: ${formatDateLong(nextCheckInDate)}.`);
+      if (selectedAvailabilityDate) {
+        renderAvailabilityBookingDetails(selectedAvailabilityDate);
+        showAvailabilityDateDetails(selectedAvailabilityDate);
+      } else {
+        renderAvailabilityCalendar();
+        renderAvailabilityBookedDatesList();
+      }
+    }
+
     async function approvePendingBooking(index) {
       if (!requireAdminAuth()) return;
 
@@ -5045,13 +5317,20 @@
       afterBookingCacheUpdate();
     }
 
-    // Admin button stays hidden until Alt + 1 (secret key: atl+1) is pressed
+    // Keyboard shortcuts: Ctrl + 1 for admin panel, Alt + 1 for booking calendar
     document.addEventListener("keydown", (event) => {
-      if (event.altKey && event.key === "1") {
+      if (event.ctrlKey && event.key === "1") {
         event.preventDefault();
         const adminBtn = document.getElementById("adminBtn");
         if (adminBtn) adminBtn.style.display = "block";
-        alert(`Admin panel unlocked with secret key ${ADMIN_UNLOCK_SECRET}.`);
+        adminLogin();
+        return;
+      }
+
+      if (event.altKey && event.key === "1") {
+        event.preventDefault();
+        showBookingCalendarWorkspace();
+        alert(`Booking calendar opened (${BOOKING_CALENDAR_SHORTCUT}).`);
       }
     });
 
@@ -5163,6 +5442,7 @@
       selectedAvailabilityDate = "";
       renderAvailabilityCalendar();
       renderAvailabilityBookedDatesList();
+      renderAvailabilityBookingDetails("");
       document.getElementById("availabilityDateDetails").innerHTML = "<h4>No Date Selected</h4><p>Select a date in the calendar to view available time and accommodation details.</p>";
     });
     document.getElementById("catering-select").addEventListener("change", renderCateringChoices);
