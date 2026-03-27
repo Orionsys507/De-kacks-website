@@ -1078,6 +1078,7 @@
     border-radius: 18px;
     border: 1px solid #d8e7df;
     background: #f7fcfa;
+    display: none;
   }
 
   .availability-booked-dates h4,
@@ -1124,6 +1125,7 @@
     border: 1px solid #d8e7df;
     background: #f7fcfa;
     transition: all 160ms ease;
+    display: none;
   }
 
   .availability-booking-details h4,
@@ -1570,15 +1572,6 @@
             <div id="availabilityDateDetails" class="availability-date-details" aria-live="polite">
               <h4>No Date Selected</h4>
               <p>Select a date in the calendar to view available time and accommodation details.</p>
-            </div>
-            <div class="availability-booked-dates">
-              <h4>Dates With Booking</h4>
-              <p id="availabilityBookedDatesEmpty">Loading booked dates...</p>
-              <ul id="availabilityBookedDatesList" class="availability-booked-dates-list"></ul>
-            </div>
-            <div id="availabilityBookingDetails" class="availability-booking-details" aria-live="polite">
-              <h4>All Bookings Summary</h4>
-              <p>Loading booking summary...</p>
             </div>
           </div>
         </div>
@@ -2167,8 +2160,6 @@
     function afterBookingCacheUpdate() {
       checkDateAvailability();
       renderAvailabilityCalendar();
-      renderAvailabilityBookedDatesList();
-      renderAvailabilityBookingDetails(selectedAvailabilityDate || "");
       if (selectedAvailabilityDate) showAvailabilityDateDetails(selectedAvailabilityDate);
       if (adminPanelOpen) viewBookings();
     }
@@ -2421,8 +2412,6 @@
       if (quotationEl) quotationEl.innerHTML = "";
       initializeAvailabilityMonth();
       renderAvailabilityCalendar();
-      renderAvailabilityBookedDatesList();
-      renderAvailabilityBookingDetails(selectedAvailabilityDate || "");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -2829,8 +2818,6 @@
       monthInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
       selectedAvailabilityDate = "";
       renderAvailabilityCalendar();
-      renderAvailabilityBookedDatesList();
-      renderAvailabilityBookingDetails("");
     }
 
     function jumpToNextMonth() {
@@ -2841,8 +2828,6 @@
       monthInput.value = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
       selectedAvailabilityDate = "";
       renderAvailabilityCalendar();
-      renderAvailabilityBookedDatesList();
-      renderAvailabilityBookingDetails("");
     }
 
     function exportCurrentMonthPdf() {
@@ -3162,29 +3147,6 @@
       }));
     }
 
-    function renderAvailabilityBookedDatesList() {
-      const listEl = document.getElementById("availabilityBookedDatesList");
-      const emptyEl = document.getElementById("availabilityBookedDatesEmpty");
-      const monthInput = document.getElementById("availabilityMonth");
-      if (!listEl || !emptyEl || !monthInput || !monthInput.value) return;
-
-      const entries = getAvailabilityBookedDateEntriesForMonth(monthInput.value);
-      if (entries.length === 0) {
-        listEl.innerHTML = "";
-        emptyEl.textContent = "No pending or approved pool booking dates for this month.";
-        return;
-      }
-
-      emptyEl.textContent = "";
-      listEl.innerHTML = entries.map((entry) => {
-        let statusText = "";
-        if (entry.approved > 0 && entry.pending > 0) statusText = `Booked: ${entry.approved} | Pending: ${entry.pending}`;
-        if (entry.approved > 0 && entry.pending === 0) statusText = `Booked: ${entry.approved}`;
-        if (entry.pending > 0 && entry.approved === 0) statusText = `Pending: ${entry.pending}`;
-        return `<li><span>${formatDateLong(entry.dateString)}</span><strong>${statusText}</strong></li>`;
-      }).join("");
-    }
-
     function getCombinedBookingsForDate(dateString) {
       const pending = getPendingBookings().map((booking) => ({ collectionType: "pending", booking }));
       const approved = getBookings().map((booking) => ({ collectionType: "approved", booking }));
@@ -3196,34 +3158,7 @@
       if (!container) return;
 
       if (!dateString) {
-        const allEntries = getAdminCombinedBookings();
-        if (allEntries.length === 0) {
-          container.innerHTML = `
-            <h4>All Bookings Summary</h4>
-            <p>No bookings available yet.</p>
-          `;
-          return;
-        }
-
-        let allHtml = `<h4>All Bookings Summary</h4><div class="availability-booking-list">`;
-        allEntries.forEach(({ collectionType, booking }) => {
-          const statusLabel = collectionType === "pending" ? "Pending Approval" : "Booked";
-          const statusColor = collectionType === "pending" ? "#b26a00" : "#1f7a3f";
-          const checkInDate = getNormalizedCheckInDate(booking);
-          const checkOutDate = getNormalizedCheckOutDate(booking);
-          const formattedCheckIn = checkInDate ? new Date(`${checkInDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) : "N/A";
-          const formattedCheckOut = checkOutDate ? new Date(`${checkOutDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" }) : "N/A";
-
-          allHtml += `
-            <div class="availability-booking-item">
-              <p><strong>${booking.name || "Guest"}</strong> <span style="color:${statusColor};font-weight:700;">(${statusLabel})</span></p>
-              <p><strong>Date:</strong> ${formattedCheckIn} to ${formattedCheckOut}</p>
-              <p><strong>Pool:</strong> ${stripPriceText(booking.poolBreakdown || "None")}</p>
-            </div>
-          `;
-        });
-        allHtml += `</div>`;
-        container.innerHTML = allHtml;
+        container.innerHTML = "";
         return;
       }
 
@@ -3310,7 +3245,6 @@
       }
 
       container.innerHTML = html;
-      renderAvailabilityBookedDatesList();
     }
 
     function getStayDates(checkInDate, stayDays) {
@@ -5536,9 +5470,8 @@
         showAvailabilityDateDetails(selectedAvailabilityDate);
       } else {
         renderAvailabilityCalendar();
-        renderAvailabilityBookedDatesList();
-        renderAvailabilityBookingDetails("");
-      }
+      renderAvailabilityBookingDetails("");
+    }
     }
 
     async function approvePendingBooking(index) {
@@ -5787,7 +5720,6 @@
     document.getElementById("availabilityMonth").addEventListener("change", () => {
       selectedAvailabilityDate = "";
       renderAvailabilityCalendar();
-      renderAvailabilityBookedDatesList();
       renderAvailabilityBookingDetails("");
       document.getElementById("availabilityDateDetails").innerHTML = "<h4>No Date Selected</h4><p>Select a date in the calendar to view available time and accommodation details.</p>";
     });
