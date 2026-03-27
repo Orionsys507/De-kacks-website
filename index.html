@@ -1054,6 +1054,123 @@
     margin-top: 8px;
   }
 
+  .admin-calendar-panel {
+    background: #ffffff;
+    border: 1px solid #d4e4de;
+    border-radius: 16px;
+    padding: 14px;
+    margin-top: 14px;
+  }
+
+  .admin-calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  .admin-calendar-header h4 {
+    margin: 0;
+    color: #0f3558;
+  }
+
+  .admin-calendar-header input[type="month"] {
+    max-width: 220px;
+  }
+
+  .admin-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .admin-calendar-day,
+  .admin-calendar-date {
+    border-radius: 10px;
+    padding: 8px 6px;
+    text-align: center;
+    font-size: 12px;
+  }
+
+  .admin-calendar-day {
+    background: #f1f7f4;
+    color: #406063;
+    font-weight: 700;
+  }
+
+  .admin-calendar-date {
+    border: 1px solid #d5e3dd;
+    background: #fefefe;
+    color: #18394f;
+    cursor: pointer;
+    min-height: 62px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .admin-calendar-date small {
+    color: #4f6675;
+    font-size: 10px;
+    line-height: 1.25;
+  }
+
+  .admin-calendar-date.empty {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .admin-calendar-date.pending-only {
+    background: #fff1dd;
+    border-color: #efc995;
+  }
+
+  .admin-calendar-date.approved-only {
+    background: #ffe2e2;
+    border-color: #e4a6a6;
+  }
+
+  .admin-calendar-date.mixed-status {
+    background: linear-gradient(135deg, #ffe2e2 50%, #fff1dd 50%);
+    border-color: #dfbab0;
+  }
+
+  .admin-calendar-date.selected {
+    outline: 2px solid #0f3e66;
+    border-color: #0f3e66;
+    font-weight: 700;
+  }
+
+  .admin-booking-list {
+    margin-top: 14px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .admin-booking-item {
+    border: 1px solid #d5e3dd;
+    border-radius: 14px;
+    padding: 12px;
+    background: #fff;
+  }
+
+  .admin-booking-item.pending {
+    border-left: 5px solid #d28d1d;
+  }
+
+  .admin-booking-item.approved {
+    border-left: 5px solid #b53f3f;
+  }
+
+  .admin-booking-item p {
+    margin: 3px 0;
+    font-size: 13px;
+    color: #274254;
+  }
+
   @keyframes floatGlow {
     0%, 100% { transform: translateY(0) scale(1); }
     50% { transform: translateY(12px) scale(1.04); }
@@ -1649,6 +1766,8 @@
     let approvedBookingsCache = [];
     let pendingBookingsCache = [];
     let adminPanelOpen = false;
+    let adminCalendarMonth = "";
+    let adminSelectedDate = "";
     let approvedBookingsUnsubscribe = null;
     let pendingBookingsUnsubscribe = null;
 
@@ -2731,6 +2850,31 @@
         selectedCheckOutDate
       );
       const requestedRooms = getRequestedRoomCounts(rooms);
+
+      for (const type in requestedRooms) {
+        if (requestedRooms[type] > availability.rooms[type]) {
+          return `Room accommodation is not enough for ${ROOM_TYPE_LABELS[type] || type}. Available now: ${Math.max(0, availability.rooms[type])}. You can still continue with pool only, or choose another available room type.`;
+        }
+      }
+
+      const needsPool = (poolDetails.baseCost > 0) || (specialEventDetails && specialEventDetails.selected);
+      if (needsPool && availability.poolRemaining <= 0) {
+        return "Pool is not available on one or more selected schedule days. You can still book available rooms or accommodation without the pool.";
+      }
+
+      return "";
+    }
+
+    function validateSelectionAgainstSources(checkInDate, stayDays, rooms, poolDetails, specialEventDetails = null, selectedCheckOutDate = "", sources = []) {
+      const availability = calculateRangeAvailabilityFromSources(
+        checkInDate,
+        stayDays,
+        sources,
+        poolDetails && poolDetails.mode ? poolDetails.mode : getPreferredStayMode(),
+        !!(specialEventDetails && specialEventDetails.selected),
+        selectedCheckOutDate
+      );
+      const requestedRooms = getRequestedRoomCounts(Array.isArray(rooms) ? rooms : []);
 
       for (const type in requestedRooms) {
         if (requestedRooms[type] > availability.rooms[type]) {
@@ -4385,6 +4529,182 @@
       if (adminPanelOpen) viewBookings();
     }
 
+    function getNormalizedCheckInDate(booking) {
+      return booking.checkInDate || booking.date || "";
+    }
+
+    function getNormalizedStayDays(booking) {
+      return parseInt(booking.stayDays, 10) || 1;
+    }
+
+    function getNormalizedCheckOutDate(booking) {
+      const checkInDate = getNormalizedCheckInDate(booking);
+      return booking.checkOutDate || addDays(checkInDate, getNormalizedStayDays(booking));
+    }
+
+    function stripPriceText(text) {
+      return String(text || "")
+        .replace(/\s*-\s*PHP[\s\d,]+(\.\d+)?/gi, "")
+        .replace(/\(\s*PHP[^\)]*\)/gi, "")
+        .replace(/\bPHP[\s\d,]+(\.\d+)?/gi, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+    }
+
+    function getBookingRoomNamesNoPrice(booking) {
+      if (!Array.isArray(booking.rooms) || booking.rooms.length === 0) return "No room selected";
+      return booking.rooms.map((room) => stripPriceText(room.text || "")).join(", ");
+    }
+
+    function getBookingPackageSummaryNoPrice(booking) {
+      if (booking.specialEventSelected) {
+        return stripPriceText(booking.specialEventLabel || "Special Event Package");
+      }
+
+      const parts = [];
+      const roomSummary = getBookingRoomNamesNoPrice(booking);
+      if (roomSummary !== "No room selected") parts.push(`Rooms: ${roomSummary}`);
+      if (booking.poolBaseCost > 0 || booking.poolBreakdown) parts.push(`Pool: ${stripPriceText(booking.poolBreakdown || "Pool package")}`);
+      if (booking.cateringSelected || booking.cateringPackage) parts.push(`Catering: ${stripPriceText(booking.cateringPackage || "Selected")}`);
+      if (booking.hallSelected) parts.push(`Function Hall: ${stripPriceText(booking.hallLabel || "Included")}`);
+      return parts.length > 0 ? parts.join(" | ") : "No package selected";
+    }
+
+    function getAdminBookingIndexById(collectionType, bookingId) {
+      const source = collectionType === "pending" ? getPendingBookings() : getBookings();
+      return source.findIndex((item) => String(item.id) === String(bookingId));
+    }
+
+    function getAdminCombinedBookings() {
+      const pending = getPendingBookings().map((booking) => ({ collectionType: "pending", booking }));
+      const approved = getBookings().map((booking) => ({ collectionType: "approved", booking }));
+      return [...pending, ...approved].sort((a, b) => {
+        const aDate = new Date(a.booking.createdAt || 0).getTime();
+        const bDate = new Date(b.booking.createdAt || 0).getTime();
+        return bDate - aDate;
+      });
+    }
+
+    function ensureAdminCalendarState(combinedBookings) {
+      if (!adminCalendarMonth) {
+        adminCalendarMonth = toISODate(new Date()).slice(0, 7);
+      }
+
+      const monthDates = [];
+      combinedBookings.forEach(({ booking }) => {
+        getBookingStayDates(booking).forEach((date) => {
+          if (date.startsWith(`${adminCalendarMonth}-`)) monthDates.push(date);
+        });
+      });
+
+      const sortedMonthDates = [...new Set(monthDates)].sort();
+      if (!adminSelectedDate || !adminSelectedDate.startsWith(`${adminCalendarMonth}-`)) {
+        adminSelectedDate = sortedMonthDates[0] || `${adminCalendarMonth}-01`;
+      }
+    }
+
+    function getAdminCalendarDayStats(combinedBookings) {
+      const stats = {};
+      combinedBookings.forEach(({ collectionType, booking }) => {
+        getBookingStayDates(booking).forEach((dateString) => {
+          if (!dateString.startsWith(`${adminCalendarMonth}-`)) return;
+          if (!stats[dateString]) stats[dateString] = { pending: 0, approved: 0 };
+          stats[dateString][collectionType] += 1;
+        });
+      });
+      return stats;
+    }
+
+    function getAdminCalendarHtml(combinedBookings) {
+      const [yearStr, monthStr] = adminCalendarMonth.split("-");
+      const year = parseInt(yearStr, 10);
+      const monthIndex = (parseInt(monthStr, 10) || 1) - 1;
+      const firstDay = new Date(year, monthIndex, 1);
+      const lastDay = new Date(year, monthIndex + 1, 0);
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dayStats = getAdminCalendarDayStats(combinedBookings);
+
+      let html = `<div class="admin-calendar-grid">`;
+      html += dayNames.map((dayName) => `<div class="admin-calendar-day">${dayName}</div>`).join("");
+
+      for (let i = 0; i < firstDay.getDay(); i += 1) {
+        html += `<button type="button" class="admin-calendar-date empty" disabled></button>`;
+      }
+
+      for (let day = 1; day <= lastDay.getDate(); day += 1) {
+        const dateString = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const stats = dayStats[dateString] || { pending: 0, approved: 0 };
+        let statusClass = "";
+        if (stats.pending > 0 && stats.approved > 0) statusClass = "mixed-status";
+        if (stats.pending > 0 && stats.approved === 0) statusClass = "pending-only";
+        if (stats.approved > 0 && stats.pending === 0) statusClass = "approved-only";
+        const selectedClass = adminSelectedDate === dateString ? "selected" : "";
+        const countText = stats.pending > 0 || stats.approved > 0
+          ? `Pending: ${stats.pending} | Booked: ${stats.approved}`
+          : "No booking";
+        html += `
+          <button type="button" class="admin-calendar-date ${statusClass} ${selectedClass}" onclick="selectAdminBookingDate('${dateString}')">
+            <span>${day}</span>
+            <small>${countText}</small>
+          </button>
+        `;
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    function getAdminBookingListHtml(combinedBookings) {
+      const entries = combinedBookings.filter(({ booking }) => getBookingStayDates(booking).includes(adminSelectedDate));
+      const readableDate = formatDateLong(adminSelectedDate);
+
+      if (entries.length === 0) {
+        return `<h4>Bookings on ${readableDate}</h4><p>No pending or booked entry for this date.</p>`;
+      }
+
+      let html = `<h4>Bookings on ${readableDate}</h4><div class="admin-booking-list">`;
+      entries.forEach(({ collectionType, booking }) => {
+        const statusLabel = collectionType === "pending" ? "Pending" : "Booked";
+        const statusColor = collectionType === "pending" ? "#b26a00" : "#1f7a3f";
+        const checkInDate = getNormalizedCheckInDate(booking);
+        const checkOutDate = getNormalizedCheckOutDate(booking);
+        const formattedCheckIn = new Date(`${checkInDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+        const formattedCheckOut = new Date(`${checkOutDate}T00:00:00`).toLocaleDateString("en-PH", { year: "numeric", month: "long", day: "numeric" });
+        const index = getAdminBookingIndexById(collectionType, booking.id);
+        const fullyPaidBtn = collectionType === "approved" && index >= 0 && !computeBookingTotals(booking).fullyPaid
+          ? `<button onclick="markBookingFullyPaid(${index})" style="background:#2e7d32;color:#fff;width:auto;padding:8px 12px;">Fully Paid</button>`
+          : "";
+        const pendingActions = collectionType === "pending" && index >= 0
+          ? `<button onclick="approvePendingBooking(${index})" style="background:#1f7a3f;color:#fff;width:auto;padding:8px 12px;">Approve</button>
+             <button onclick="rejectPendingBooking(${index})" style="background:#c62828;color:#fff;width:auto;padding:8px 12px;">Reject</button>`
+          : "";
+
+        html += `
+          <div class="admin-booking-item ${collectionType}">
+            <p><strong>${booking.name || "Guest"}</strong> <span style="color:${statusColor};font-weight:700;">(${statusLabel})</span></p>
+            <p><strong>Reference:</strong> ${booking.reservationReference || "N/A"}</p>
+            <p><strong>Contact Number:</strong> ${booking.contactNumber || "N/A"}</p>
+            <p><strong>Package:</strong> ${getBookingPackageSummaryNoPrice(booking)}</p>
+            <p><strong>Stay:</strong> ${getBookingStayLabel(booking)}</p>
+            <p><strong>Check-in:</strong> ${formattedCheckIn} ${booking.checkInTime || "08:00"}</p>
+            <p><strong>Check-out:</strong> ${formattedCheckOut} ${booking.checkOutTime || "17:00"}</p>
+            <p><strong>Guests:</strong> ${booking.guests || 0}</p>
+            <p><strong>Rooms:</strong> ${getBookingRoomNamesNoPrice(booking)}</p>
+            <p><strong>Pool:</strong> ${stripPriceText(booking.poolBreakdown || "None")}</p>
+            <p><strong>Catering:</strong> ${stripPriceText(booking.cateringPackage || "None")} ${booking.cateringPersons ? `(${booking.cateringPersons} pax)` : ""}</p>
+            <p><strong>Function Hall:</strong> ${booking.hallSelected ? stripPriceText(booking.hallLabel || "Included") : "None"}</p>
+            <button onclick="rebookBookingById('${collectionType}', '${String(booking.id)}')" style="background:#0f3e66;color:#fff;width:auto;padding:8px 12px;">Rebooking</button>
+            <button class="delete-btn" onclick="deleteBookingById('${collectionType}', '${String(booking.id)}')">Delete</button>
+            ${pendingActions}
+            ${fullyPaidBtn}
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      return html;
+    }
+
     function viewBookings() {
       showAdminWorkspace();
       if (!isAdminAuthenticated()) {
@@ -4394,134 +4714,130 @@
 
       const pending = getPendingBookings();
       const approved = getBookings();
+      const combinedBookings = getAdminCombinedBookings();
 
-      if (pending.length === 0 && approved.length === 0) {
+      if (combinedBookings.length === 0) {
         document.getElementById("quotation").innerHTML = "<h3>No bookings yet.</h3>";
         return;
       }
 
+      ensureAdminCalendarState(combinedBookings);
+
       let output = `<h3>Admin Booking Panel</h3>`;
       output += `<p><strong>Signed in as:</strong> ${auth.currentUser.email || "Admin"}</p>`;
       output += `<button onclick="adminLogout()" style="background:#455a64;color:#fff;width:auto;padding:8px 12px;">Log Out</button>`;
-      output += `<p><strong>Pending Approval:</strong> ${pending.length} | <strong>Approved:</strong> ${approved.length}</p><hr>`;
-
-      output += `<h3>Pending Reservations</h3>`;
-      if (pending.length === 0) {
-        output += `<p>No pending reservations.</p><hr>`;
-      } else {
-        pending.forEach((booking, index) => {
-          const normalizedCheckIn = booking.checkInDate || booking.date;
-          const normalizedStayDays = parseInt(booking.stayDays, 10) || 1;
-          const normalizedCheckOut = booking.checkOutDate || addDays(normalizedCheckIn, normalizedStayDays);
-          const formattedCheckIn = new Date(`${normalizedCheckIn}T00:00:00`).toLocaleDateString("en-PH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          });
-          const formattedCheckOut = new Date(`${normalizedCheckOut}T00:00:00`).toLocaleDateString("en-PH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          });
-
-          const totals = computeBookingTotals(booking);
-
-          output += `
-            <div>
-              <p><strong>${index + 1}. ${booking.name}</strong> <span style="color:#b26a00;font-weight:700;">(Pending)</span></p>
-              <p>Reference No.: ${booking.reservationReference || "N/A"}</p>
-              <p>Contact Number: ${booking.contactNumber || "N/A"}</p>
-              <p>Stay: ${getBookingStayLabel(booking)}</p>
-              <p>Check-in: ${formattedCheckIn} ${booking.checkInTime || "08:00"}</p>
-              <p>Check-out: ${formattedCheckOut} ${booking.checkOutTime || "17:00"}</p>
-              <p>Guests: ${booking.guests}</p>
-              <p>Room Usage: ${Math.max(12, Number(booking.roomHours) || 12)} hour(s)</p>
-              <p>Special Event: ${booking.specialEventSelected ? `${booking.specialEventLabel} - PHP ${Number(booking.specialEventCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${booking.specialEventCateringMode === "with" ? "With cater" : "Non-cater"})` : "None"}</p>
-              <p>Rooms: ${
-                Array.isArray(booking.rooms) && booking.rooms.length > 0
-                  ? booking.rooms.map((r) => r.text.split(" - ")[0]).join(", ")
-                  : "No room selected"
-              }</p>
-              <p>Pool: ${booking.poolBreakdown || "None"}</p>
-              <p>Catering: ${booking.cateringPackage || "None"} ${booking.cateringPersons ? `(${booking.cateringPersons} pax)` : ""} ${booking.cateringCost ? `(PHP ${Number(booking.cateringCost).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : ""}</p>
-              <p>Catering Choices: ${booking.cateringChoicesSummary || "N/A"}</p>
-              <p>Function Hall: ${booking.hallSelected ? `${booking.hallLabel || "Included"} (${booking.hallHours || 8} hours) - PHP ${Number(booking.hallCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${booking.hallFreeNote ? ` (${booking.hallFreeNote})` : ""}` : "None"}</p>
-              <p><strong>Subtotal:</strong> PHP ${totals.subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p><strong>Management Discount:</strong> ${totals.managementDiscountPercent}% (PHP ${totals.managementDiscountAmount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</p>
-              <p><strong>Net Total:</strong> PHP ${totals.total.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p><strong>Required Downpayment (20%):</strong> PHP ${totals.downpayment.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <label style="font-weight:700;">Management Discount (%)</label>
-              <input id="pendingDiscountInput_${index}" type="number" min="0" max="100" step="1" value="${Number(booking.managementDiscountPercent || 0)}" style="max-width:160px;" />
-              <button onclick="applyManagementDiscount('pending', ${index})" style="background:#0f3e66;color:#fff;width:auto;padding:8px 12px;">Apply Discount</button>
-              <button onclick="downloadAdminBookingPDF('pending', ${index})" style="background:#455a64;color:#fff;width:auto;padding:8px 12px;">Download PDF</button>
-              <button onclick="approvePendingBooking(${index})" style="background:#1f7a3f;color:#fff;width:auto;padding:8px 12px;">Approve</button>
-              <button onclick="rejectPendingBooking(${index})" style="background:#c62828;color:#fff;width:auto;padding:8px 12px;">Reject</button>
-              <hr>
-            </div>
-          `;
-        });
-      }
-
-      output += `<h3>Approved Reservations</h3>`;
-      if (approved.length === 0) {
-        output += `<p>No approved reservations yet.</p>`;
-      } else {
-        approved.forEach((booking, index) => {
-          const normalizedCheckIn = booking.checkInDate || booking.date;
-          const normalizedStayDays = parseInt(booking.stayDays, 10) || 1;
-          const normalizedCheckOut = booking.checkOutDate || addDays(normalizedCheckIn, normalizedStayDays);
-          const formattedCheckIn = new Date(`${normalizedCheckIn}T00:00:00`).toLocaleDateString("en-PH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          });
-          const formattedCheckOut = new Date(`${normalizedCheckOut}T00:00:00`).toLocaleDateString("en-PH", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          });
-
-          const totals = computeBookingTotals(booking);
-
-          output += `
-            <div>
-              <p><strong>${index + 1}. ${booking.name}</strong> <span style="color:#1f7a3f;font-weight:700;">(Approved)</span></p>
-              <p>Reference No.: ${booking.reservationReference || "N/A"}</p>
-              <p>Contact Number: ${booking.contactNumber || "N/A"}</p>
-              <p>Stay: ${getBookingStayLabel(booking)}</p>
-              <p>Check-in: ${formattedCheckIn} ${booking.checkInTime || "08:00"}</p>
-              <p>Check-out: ${formattedCheckOut} ${booking.checkOutTime || "17:00"}</p>
-              <p>Guests: ${booking.guests}</p>
-              <p>Room Usage: ${Math.max(12, Number(booking.roomHours) || 12)} hour(s)</p>
-              <p>Special Event: ${booking.specialEventSelected ? `${booking.specialEventLabel} - PHP ${Number(booking.specialEventCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${booking.specialEventCateringMode === "with" ? "With cater" : "Non-cater"})` : "None"}</p>
-              <p>Rooms: ${
-                Array.isArray(booking.rooms) && booking.rooms.length > 0
-                  ? booking.rooms.map((r) => r.text.split(" - ")[0]).join(", ")
-                  : "No room selected"
-              }</p>
-              <p>Pool: ${booking.poolBreakdown || "None"}</p>
-              <p>Catering: ${booking.cateringPackage || "None"} ${booking.cateringPersons ? `(${booking.cateringPersons} pax)` : ""} ${booking.cateringCost ? `(PHP ${Number(booking.cateringCost).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` : ""}</p>
-              <p>Catering Choices: ${booking.cateringChoicesSummary || "N/A"}</p>
-              <p>Function Hall: ${booking.hallSelected ? `${booking.hallLabel || "Included"} (${booking.hallHours || 8} hours) - PHP ${Number(booking.hallCost || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${booking.hallFreeNote ? ` (${booking.hallFreeNote})` : ""}` : "None"}</p>
-              <p><strong>Subtotal:</strong> PHP ${totals.subtotal.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p><strong>Management Discount:</strong> ${totals.managementDiscountPercent}% (PHP ${totals.managementDiscountAmount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</p>
-              <p><strong>Net Total:</strong> PHP ${totals.total.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p><strong>Original Inquiry Downpayment:</strong> PHP ${totals.downpayment.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p><strong>Remaining Balance After Downpayment:</strong> PHP ${totals.remainingBalance.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p><strong>Payment Status:</strong> ${totals.fullyPaid ? "Fully Paid" : "Balance Pending"}</p>
-              <label style="font-weight:700;">Management Discount (%)</label>
-              <input id="approvedDiscountInput_${index}" type="number" min="0" max="100" step="1" value="${Number(booking.managementDiscountPercent || 0)}" style="max-width:160px;" />
-              <button onclick="applyManagementDiscount('approved', ${index})" style="background:#0f3e66;color:#fff;width:auto;padding:8px 12px;">Apply Discount</button>
-              <button onclick="downloadAdminBookingPDF('approved', ${index})" style="background:#455a64;color:#fff;width:auto;padding:8px 12px;">Download PDF</button>
-              ${totals.fullyPaid ? "" : `<button onclick="markBookingFullyPaid(${index})" style="background:#2e7d32;color:#fff;width:auto;padding:8px 12px;">Fully Paid</button>`}
-              <button class="delete-btn" onclick="deleteApprovedBooking(${index})">Delete</button>
-              <hr>
-            </div>
-          `;
-        });
-      }
+      output += `<p><strong>Pending Approval:</strong> ${pending.length} | <strong>Approved:</strong> ${approved.length}</p>`;
+      output += `
+        <div class="admin-calendar-panel">
+          <div class="admin-calendar-header">
+            <h4>Booking Calendar</h4>
+            <input type="month" value="${adminCalendarMonth}" onchange="changeAdminCalendarMonth(this.value)" />
+          </div>
+          ${getAdminCalendarHtml(combinedBookings)}
+          ${getAdminBookingListHtml(combinedBookings)}
+        </div>
+      `;
 
       document.getElementById("quotation").innerHTML = output;
+    }
+
+    function changeAdminCalendarMonth(nextMonth) {
+      if (!nextMonth) return;
+      adminCalendarMonth = nextMonth;
+      adminSelectedDate = "";
+      if (adminPanelOpen) viewBookings();
+    }
+
+    function selectAdminBookingDate(dateString) {
+      adminSelectedDate = dateString;
+      if (adminPanelOpen) viewBookings();
+    }
+
+    async function deleteBookingById(collectionType, bookingId) {
+      if (!requireAdminAuth()) return;
+      const collectionName = getCollectionName(collectionType);
+      const question = collectionType === "pending"
+        ? "Delete this pending reservation?"
+        : "Delete this approved booking?";
+      if (!confirm(question)) return;
+      await deleteBookingRecord(collectionName, bookingId);
+      if (adminPanelOpen) viewBookings();
+    }
+
+    async function rebookBookingById(collectionType, bookingId) {
+      if (!requireAdminAuth()) return;
+
+      const source = collectionType === "pending" ? getPendingBookings() : getBookings();
+      const booking = source.find((item) => String(item.id) === String(bookingId));
+      if (!booking) return;
+
+      const currentCheckIn = getNormalizedCheckInDate(booking);
+      const inputDate = prompt("Enter new check-in date (YYYY-MM-DD):", currentCheckIn);
+      if (!inputDate) return;
+      const nextCheckInDate = inputDate.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(nextCheckInDate)) {
+        alert("Invalid date format. Please use YYYY-MM-DD.");
+        return;
+      }
+      const todayIso = toISODate(new Date());
+      if (nextCheckInDate < todayIso) {
+        alert("Rebooking date cannot be in the past.");
+        return;
+      }
+
+      const stayDays = getNormalizedStayDays(booking);
+      const poolMode = inferBookingPoolMode(booking);
+      const selectedCheckOutDate = addDays(nextCheckInDate, stayDays);
+      const schedule = getScheduleFromRules(
+        nextCheckInDate,
+        stayDays,
+        booking.checkInTime || "08:00",
+        poolMode,
+        !!booking.specialEventSelected,
+        selectedCheckOutDate
+      );
+
+      const otherApproved = getBookings().filter((item) => String(item.id) !== String(bookingId));
+      const otherPending = getPendingBookings().filter((item) => String(item.id) !== String(bookingId));
+      const comparisonSource = collectionType === "approved" ? otherApproved : [...otherApproved, ...otherPending];
+
+      const validationError = validateSelectionAgainstSources(
+        nextCheckInDate,
+        stayDays,
+        Array.isArray(booking.rooms) ? booking.rooms : [],
+        {
+          baseCost: booking.poolBaseCost || 0,
+          computedCost: booking.poolComputedCost || 0,
+          breakdown: booking.poolBreakdown || "None",
+          schedule: booking.poolSchedule || "N/A",
+          mode: poolMode,
+        },
+        {
+          selected: !!booking.specialEventSelected,
+          baseCost: booking.specialEventCost || 0,
+        },
+        schedule.checkOutDate,
+        comparisonSource
+      );
+
+      if (validationError) {
+        alert(`Cannot rebook: ${validationError}`);
+        return;
+      }
+
+      const updatedBooking = {
+        ...booking,
+        checkInDate: nextCheckInDate,
+        checkOutDate: schedule.checkOutDate,
+        checkInTime: schedule.checkInTime,
+        checkOutTime: schedule.checkOutTime,
+        occupiedDates: schedule.occupiedDates,
+        rebookedAt: new Date().toISOString(),
+      };
+
+      await saveBookingRecord(getCollectionName(collectionType), updatedBooking);
+      alert(`Rebooking complete. New check-in date: ${formatDateLong(nextCheckInDate)}.`);
+      if (adminPanelOpen) viewBookings();
     }
 
     async function approvePendingBooking(index) {
