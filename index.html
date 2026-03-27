@@ -1495,6 +1495,15 @@
       <button id="enterBookingBtn" type="button" class="primary-btn" onclick="closeWelcomePopup()">Enter Booking Panel</button>
     </div>
   </div>
+  <script>
+    (function () {
+      const enterBtn = document.getElementById("enterBookingBtn");
+      const overlay = document.getElementById("welcomeOverlay");
+      if (enterBtn && overlay) {
+        enterBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+      }
+    })();
+  </script>
   <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
   <div id="offlineRibbon" class="offline-ribbon">Offline mode: showing cached bookings.</div>
   <div class="weather-scene" aria-hidden="true">
