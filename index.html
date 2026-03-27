@@ -1698,7 +1698,7 @@
   <script>
     const STORAGE_KEY = "bookings";
     const PENDING_STORAGE_KEY = "pendingBookings";
-    const ADMIN_PANEL_SHORTCUT = "ctrl+1";
+    const ADMIN_PANEL_SHORTCUT = "ctrl+a";
     const BOOKING_CALENDAR_SHORTCUT = "alt+1";
     const BOOKINGS_COLLECTION = "bookings";
     const PENDING_BOOKINGS_COLLECTION = "pendingBookings";
@@ -5335,8 +5335,16 @@
       afterBookingCacheUpdate();
     }
 
-    // Keyboard shortcuts: Ctrl + 1 for admin panel, Alt + 1 for booking calendar
+    // Keyboard shortcuts: Ctrl + A for admin panel, Alt + 1 for booking calendar
     document.addEventListener("keydown", (event) => {
+      if (event.ctrlKey && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        const adminBtn = document.getElementById("adminBtn");
+        if (adminBtn) adminBtn.style.display = "block";
+        adminLogin();
+        return;
+      }
+
       if (event.ctrlKey && event.key === "1") {
         event.preventDefault();
         const adminBtn = document.getElementById("adminBtn");
