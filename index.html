@@ -993,6 +993,51 @@
     line-height: 1.55;
   }
 
+  .availability-booked-dates {
+    margin-top: 14px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    border: 1px solid #d8e7df;
+    background: #f7fcfa;
+  }
+
+  .availability-booked-dates h4,
+  .availability-booked-dates p {
+    margin: 0;
+  }
+
+  .availability-booked-dates h4 {
+    color: var(--primary);
+    margin-bottom: 8px;
+  }
+
+  .availability-booked-dates p {
+    color: #4d6661;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .availability-booked-dates-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0;
+    display: grid;
+    gap: 8px;
+  }
+
+  .availability-booked-dates-list li {
+    border: 1px solid #d6e4df;
+    border-radius: 12px;
+    background: #fff;
+    padding: 8px 10px;
+    color: #274740;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
   @media (max-width: 640px) {
     .catering-options-grid {
       grid-template-columns: 1fr;
@@ -1317,6 +1362,11 @@
           <h4>No Date Selected</h4>
           <p>Select a date in the calendar to view available time and accommodation details.</p>
         </div>
+        <div class="availability-booked-dates">
+          <h4>Dates With Booking</h4>
+          <p id="availabilityBookedDatesEmpty">Loading booked dates...</p>
+          <ul id="availabilityBookedDatesList" class="availability-booked-dates-list"></ul>
+        </div>
         <button type="button" class="primary-btn" onclick="continueToQuotationForm()">Continue to Booking Form</button>
       </div>
     </div>
@@ -1574,6 +1624,7 @@
   <script>
     const STORAGE_KEY = "bookings";
     const PENDING_STORAGE_KEY = "pendingBookings";
+    const ADMIN_UNLOCK_SECRET = "atl+1";
     const BOOKINGS_COLLECTION = "bookings";
     const PENDING_BOOKINGS_COLLECTION = "pendingBookings";
     const FIREBASE_CONFIG = {
@@ -1854,6 +1905,7 @@
     function afterBookingCacheUpdate() {
       checkDateAvailability();
       renderAvailabilityCalendar();
+      renderAvailabilityBookedDatesList();
       if (selectedAvailabilityDate) showAvailabilityDateDetails(selectedAvailabilityDate);
       if (adminPanelOpen) viewBookings();
     }
@@ -2680,6 +2732,56 @@
       renderAvailabilityCalendar();
     }
 
+    function getAvailabilityBookedDateEntriesForMonth(monthValue) {
+      if (!monthValue) return [];
+
+      const entryMap = {};
+      getBookings().filter((booking) => bookingUsesPool(booking)).forEach((booking) => {
+        getBookingStayDates(booking).forEach((dateString) => {
+          if (!dateString.startsWith(`${monthValue}-`)) return;
+          if (!entryMap[dateString]) entryMap[dateString] = { approved: 0, pending: 0 };
+          entryMap[dateString].approved += 1;
+        });
+      });
+
+      getPendingBookings().filter((booking) => bookingUsesPool(booking)).forEach((booking) => {
+        getBookingStayDates(booking).forEach((dateString) => {
+          if (!dateString.startsWith(`${monthValue}-`)) return;
+          if (!entryMap[dateString]) entryMap[dateString] = { approved: 0, pending: 0 };
+          entryMap[dateString].pending += 1;
+        });
+      });
+
+      return Object.keys(entryMap).sort().map((dateString) => ({
+        dateString,
+        approved: entryMap[dateString].approved,
+        pending: entryMap[dateString].pending,
+      }));
+    }
+
+    function renderAvailabilityBookedDatesList() {
+      const listEl = document.getElementById("availabilityBookedDatesList");
+      const emptyEl = document.getElementById("availabilityBookedDatesEmpty");
+      const monthInput = document.getElementById("availabilityMonth");
+      if (!listEl || !emptyEl || !monthInput || !monthInput.value) return;
+
+      const entries = getAvailabilityBookedDateEntriesForMonth(monthInput.value);
+      if (entries.length === 0) {
+        listEl.innerHTML = "";
+        emptyEl.textContent = "No pending or approved pool booking dates for this month.";
+        return;
+      }
+
+      emptyEl.textContent = "";
+      listEl.innerHTML = entries.map((entry) => {
+        let statusText = "";
+        if (entry.approved > 0 && entry.pending > 0) statusText = `Booked: ${entry.approved} | Pending: ${entry.pending}`;
+        if (entry.approved > 0 && entry.pending === 0) statusText = `Booked: ${entry.approved}`;
+        if (entry.pending > 0 && entry.approved === 0) statusText = `Pending: ${entry.pending}`;
+        return `<li><span>${formatDateLong(entry.dateString)}</span><strong>${statusText}</strong></li>`;
+      }).join("");
+    }
+
     function renderAvailabilityCalendar() {
       const container = document.getElementById("availabilityCalendar");
       const monthInput = document.getElementById("availabilityMonth");
@@ -2717,6 +2819,7 @@
       }
 
       container.innerHTML = html;
+      renderAvailabilityBookedDatesList();
     }
 
     function getStayDates(checkInDate, stayDays) {
@@ -4654,15 +4757,21 @@
       return html;
     }
 
-    function getAdminBookingListHtml(combinedBookings) {
-      const entries = combinedBookings.filter(({ booking }) => getBookingStayDates(booking).includes(adminSelectedDate));
-      const readableDate = formatDateLong(adminSelectedDate);
+    function getAdminBookingListHtml(combinedBookings, selectedDate = "") {
+      const entries = selectedDate
+        ? combinedBookings.filter(({ booking }) => getBookingStayDates(booking).includes(selectedDate))
+        : combinedBookings;
+      const readableDate = selectedDate ? formatDateLong(selectedDate) : "";
 
       if (entries.length === 0) {
-        return `<h4>Bookings on ${readableDate}</h4><p>No pending or booked entry for this date.</p>`;
+        return selectedDate
+          ? `<h4>Bookings on ${readableDate}</h4><p>No pending or booked entry for this date.</p>`
+          : "<h4>All Bookings</h4><p>No pending or approved entries yet.</p>";
       }
 
-      let html = `<h4>Bookings on ${readableDate}</h4><div class="admin-booking-list">`;
+      let html = selectedDate
+        ? `<h4>Bookings on ${readableDate}</h4><div class="admin-booking-list">`
+        : `<h4>All Bookings</h4><div class="admin-booking-list">`;
       entries.forEach(({ collectionType, booking }) => {
         const statusLabel = collectionType === "pending" ? "Pending" : "Booked";
         const statusColor = collectionType === "pending" ? "#b26a00" : "#1f7a3f";
@@ -4721,22 +4830,11 @@
         return;
       }
 
-      ensureAdminCalendarState(combinedBookings);
-
       let output = `<h3>Admin Booking Panel</h3>`;
       output += `<p><strong>Signed in as:</strong> ${auth.currentUser.email || "Admin"}</p>`;
       output += `<button onclick="adminLogout()" style="background:#455a64;color:#fff;width:auto;padding:8px 12px;">Log Out</button>`;
       output += `<p><strong>Pending Approval:</strong> ${pending.length} | <strong>Approved:</strong> ${approved.length}</p>`;
-      output += `
-        <div class="admin-calendar-panel">
-          <div class="admin-calendar-header">
-            <h4>Booking Calendar</h4>
-            <input type="month" value="${adminCalendarMonth}" onchange="changeAdminCalendarMonth(this.value)" />
-          </div>
-          ${getAdminCalendarHtml(combinedBookings)}
-          ${getAdminBookingListHtml(combinedBookings)}
-        </div>
-      `;
+      output += getAdminBookingListHtml(combinedBookings);
 
       document.getElementById("quotation").innerHTML = output;
     }
@@ -4947,13 +5045,13 @@
       afterBookingCacheUpdate();
     }
 
-    // Admin button stays hidden until Ctrl + A is pressed
+    // Admin button stays hidden until Alt + 1 (secret key: atl+1) is pressed
     document.addEventListener("keydown", (event) => {
-      if (event.ctrlKey && event.key.toLowerCase() === "a") {
+      if (event.altKey && event.key === "1") {
         event.preventDefault();
         const adminBtn = document.getElementById("adminBtn");
         if (adminBtn) adminBtn.style.display = "block";
-        alert("Admin panel unlocked.");
+        alert(`Admin panel unlocked with secret key ${ADMIN_UNLOCK_SECRET}.`);
       }
     });
 
@@ -5064,6 +5162,7 @@
     document.getElementById("availabilityMonth").addEventListener("change", () => {
       selectedAvailabilityDate = "";
       renderAvailabilityCalendar();
+      renderAvailabilityBookedDatesList();
       document.getElementById("availabilityDateDetails").innerHTML = "<h4>No Date Selected</h4><p>Select a date in the calendar to view available time and accommodation details.</p>";
     });
     document.getElementById("catering-select").addEventListener("change", renderCateringChoices);
