@@ -5253,6 +5253,9 @@
           ? `<button onclick="approvePendingBooking(${index})" style="background:#1f7a3f;color:#fff;width:auto;padding:8px 12px;">Approve</button>
              <button onclick="rejectPendingBooking(${index})" style="background:#c62828;color:#fff;width:auto;padding:8px 12px;">Reject</button>`
           : "";
+        const rebookBtn = collectionType === "approved" && index >= 0
+          ? `<button onclick="rebookBookingById('${collectionType}', '${String(booking.id)}')" style="background:#0f3e66;color:#fff;width:auto;padding:8px 12px;">Rebook</button>`
+          : "";
 
         html += `
           <div class="admin-booking-item ${collectionType}">
@@ -5271,6 +5274,7 @@
             <button class="delete-btn" onclick="deleteBookingById('${collectionType}', '${String(booking.id)}')">Delete</button>
             ${pendingActions}
             ${fullyPaidBtn}
+            ${rebookBtn}
           </div>
         `;
       });
