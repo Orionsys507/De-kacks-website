@@ -1487,7 +1487,7 @@
 </style>
 </head>
 <body>
-  <div id="welcomeOverlay" class="welcome-overlay hidden">
+  <div id="welcomeOverlay" class="welcome-overlay">
     <div class="welcome-modal">
       <span class="welcome-badge">Welcome Guest</span>
       <h2 id="welcomeGreeting">Welcome to Dekack's Private Resort and Hotel</h2>
@@ -5789,8 +5789,6 @@
     });
     document.getElementById("showRoomsCheckbox").addEventListener("change", () => setQuickSetupActive(""));
     document.getElementById("showPoolCheckbox").addEventListener("change", () => setQuickSetupActive(""));
-    const welcomeOverlay = document.getElementById("welcomeOverlay");
-    if (welcomeOverlay) welcomeOverlay.classList.add("hidden");
   </script>
 </body>
 </html>
